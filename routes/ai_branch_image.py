@@ -1,0 +1,305 @@
+"""
+ai_branch_image.py
+方案B：文字续写 + AI配图（文生图）
+调用 Stable Diffusion / 豆包文生图 API 生成场景图，分支弹窗显示 图片+文字
+
+【API Key 占位】
+- STABLE_DIFFUSION_API_KEY: Stable Diffusion API Key（https://platform.stability.ai/）
+- DOUBAO_IMAGE_API_KEY:  豆包文生图 API Key（需要在火山引擎开通）
+  填入 config.py 的 DOUBAO_IMAGE_API_KEY 字段
+
+【使用方式】
+branch_results 表中 result_type='image' 的记录，
+前端分支弹窗会同时显示 ai_response（文字）和 media_path（图片URL）
+"""
+
+import os
+import time
+import json
+import base64
+import requests
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+import database
+from ai_service import generate_branch
+
+router = APIRouter(prefix="/ai", tags=["ai-image"])
+
+# ============================
+# 配置（修改这里的 API Key）
+# ============================
+STABLE_DIFFUSION_API_KEY = getattr(__import__("config", fromlist=["STABLE_DIFFUSION_API_KEY"]), "STABLE_DIFFUSION_API_KEY", "")
+DOUBAO_IMAGE_API_KEY   = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_API_KEY"]),   "DOUBAO_IMAGE_API_KEY",   "")
+DOUBAO_IMAGE_BASE_URL  = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_BASE_URL"]),  "DOUBAO_IMAGE_BASE_URL",  "https://ark.cn-beijing.volces.com/api/v3")
+
+# 生成的图片保存目录（相对于 backend/）
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "multimodal_assets")
+os.makedirs(ASSETS_DIR, exist_ok=True)
+
+# 前端访问图片的 URL 前缀（根据实际情况修改）
+# 开发环境：http://localhost:8000/static/multimodal_assets
+# 生产环境：改为实际域名
+MEDIA_URL_PREFIX = "/static/multimodal_assets"
+
+
+class BranchImageRequest(BaseModel):
+    episode_no:   int    = 67
+    highlight_id:  int
+    branch_id:     str    # A / B / C
+    branch_text:   str    = ""
+    context:       str    = ""
+
+
+# ============================
+# 文生图调用函数
+# ============================
+
+def generate_image_stable_diffusion(prompt: str, output_path: str) -> bool:
+    """
+    调用 Stable Diffusion API 生成图片（需要 API Key）
+    文档：https://platform.stability.ai/docs/api-reference#tag/Text-to-Image
+    """
+    if not STABLE_DIFFUSION_API_KEY:
+        print("[ImageGen] Stable Diffusion API Key 未配置，跳过")
+        return False
+    url = "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
+    headers = {
+        "Authorization": f"Bearer {STABLE_DIFFUSION_API_KEY}",
+        "Content-Type":  "application/json",
+        "Accept":        "application/json",
+    }
+    payload = {
+        "text_prompts": [{"text": prompt, "weight": 1}],
+        "cfg_scale":     7,
+        "height":        512,
+        "width":         512,
+        "samples":       1,
+        "steps":         30,
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        img_b64 = data["artifacts"][0]["base64"]
+        with open(output_path, "wb") as f:
+            f.write(base64.b64decode(img_b64))
+        print(f"[ImageGen] Stable Diffusion 图片已保存：{output_path}")
+        return True
+    except Exception as e:
+        print(f"[ImageGen] Stable Diffusion 失败：{e}")
+        return False
+
+
+def generate_image_doubao(prompt: str, output_path: str) -> bool:
+    """
+    调用豆包文生图 API 生成图片（需要开通火山引擎文生图权限）
+    文档：https://www.volcengine.com/docs/82379
+    """
+    if not DOUBAO_IMAGE_API_KEY:
+        print("[ImageGen] 豆包文生图 API Key 未配置，跳过")
+        return False
+    # 豆包文生图接口（以火山引擎实际文档为准，以下为示例格式）
+    url = f"{DOUBAO_IMAGE_BASE_URL}/images/generations"
+    headers = {
+        "Authorization": f"Bearer {DOUBAO_IMAGE_API_KEY}",
+        "Content-Type":  "application/json",
+    }
+    payload = {
+        "model":  "doubao-image-generation-v2",  # 以实际模型 ID 为准
+        "prompt": prompt,
+        "size":   "512x512",
+        "n":      1,
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        # 响应格式以实际 API 为准，可能是 URL 或 base64
+        img_url = data.get("data", [{}])[0].get("url", "")
+        if img_url:
+            img_resp = requests.get(img_url, timeout=30)
+            img_resp.raise_for_status()
+            with open(output_path, "wb") as f:
+                f.write(img_resp.content)
+        else:
+            img_b64 = data.get("data", [{}])[0].get("b64_json", "")
+            with open(output_path, "wb") as f:
+                f.write(base64.b64decode(img_b64))
+        print(f"[ImageGen] 豆包文生图已保存：{output_path}")
+        return True
+    except Exception as e:
+        print(f"[ImageGen] 豆包文生图失败：{e}")
+        return False
+
+
+def generate_placeholder_image(prompt: str, output_path: str) -> bool:
+    """
+    Demo 占位图生成：用 PIL 生成一张带文字的占位图（不需要任何 API Key）
+    正式环境请改用上面的真实文生图 API
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new("RGB", (512, 512), color=(30, 30, 40))
+        draw = ImageDraw.Draw(img)
+        # 尝试用系统字体，失败则用默认
+        try:
+            font = ImageFont.truetype("msyh.ttc", 24)
+        except Exception:
+            font = ImageFont.load_default()
+        # 在图片中央写 prompt 摘要（最多显示100字）
+        display_text = prompt[:100] + ("..." if len(prompt) > 100 else "")
+        lines = []
+        line = ""
+        for ch in display_text:
+            line += ch
+            if len(line) >= 20:
+                lines.append(line)
+                line = ""
+        if line:
+            lines.append(line)
+        y = 200
+        for ln in lines:
+            draw.text((30, y), ln, fill=(200, 200, 180), font=font)
+            y += 32
+        img.save(output_path)
+        print(f"[ImageGen] 占位图已生成：{output_path}")
+        return True
+    except Exception as e:
+        print(f"[ImageGen] 占位图生成失败（请安装 Pillow：pip install Pillow）：{e}")
+        return False
+
+
+def build_image_prompt(scene_desc: str, branch_text: str, action_desc: str) -> str:
+    """
+    根据高光点信息，构建文生图的 prompt
+    优化方向：突出古墓探险的氛围感，适合做分支场景图
+    """
+    return (
+        f"古墓探险场景，{scene_desc}，"
+        f"角色正在{action_desc}，"
+        f"观众选择了「{branch_text}」，"
+        f"暗调光线，悬疑氛围，电影感，精细细节，512x512"
+    )
+
+
+# ============================
+# API 路由
+# ============================
+
+@router.post("/branch-with-image", summary="AI生成剧情分支续写 + 文生图")
+def generate_story_branch_with_image(req: BranchImageRequest):
+    """
+    与 /ai/branch 类似，但额外生成一张文生图。
+    结果缓存到 branch_results 表（result_type='image'）。
+    如果文生图失败，仍返回文字续写，media_path 为空。
+    """
+    conn = database.get_connection()
+    cur = conn.cursor()
+
+    # 1. 查找高光点
+    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
+    episode = cur.fetchone()
+    if not episode:
+        raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
+    episode_id = episode["id"]
+
+    cur.execute(
+        "SELECT * FROM highlights WHERE id=%s AND episode_id=%s",
+        (req.highlight_id, episode_id),
+    )
+    highlight = cur.fetchone()
+    if not highlight:
+        raise HTTPException(status_code=404, detail=f"高光点 {req.highlight_id} 不存在")
+
+    # 2. 检查缓存（result_type='image'）
+    cur.execute(
+        "SELECT * FROM branch_results WHERE highlight_id=%s AND branch_id=%s AND result_type='image'",
+        (req.highlight_id, req.branch_id),
+    )
+    cached = cur.fetchone()
+    if cached:
+        return {
+            "branch_id":   req.branch_id,
+            "text":         cached["ai_response"],
+            "image_url":    cached["media_path"] or "",
+            "result_type":  "image",
+            "cached":       True,
+            "token_usage":  cached["token_usage"],
+        }
+
+    # 3. 调用 AI 文字续写
+    branch_text = req.branch_text
+    if not branch_text:
+        import json as _json
+        opts = highlight.get("branch_options") or "[]"
+        if isinstance(opts, str):
+            try:
+                opts = _json.loads(opts)
+            except Exception:
+                opts = []
+        for opt in opts:
+            if opt.get("id") == req.branch_id:
+                branch_text = opt.get("text", "")
+                break
+
+    scene_desc  = req.context or highlight.get("scene_desc", "")
+    ai_result   = generate_branch(
+        scene_desc=scene_desc,
+        characters=highlight.get("action_desc", ""),
+        emotion=highlight.get("emotion", ""),
+        branch_text=branch_text,
+        branch_id=req.branch_id,
+    )
+    ai_text = ai_result["text"]
+
+    # 4. 调用文生图
+    image_prompt = build_image_prompt(scene_desc, branch_text, highlight.get("action_desc", ""))
+    episode_assets_dir = os.path.join(ASSETS_DIR, f"ep{req.episode_no}")
+    os.makedirs(episode_assets_dir, exist_ok=True)
+    img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
+    img_path     = os.path.join(episode_assets_dir, img_filename)
+
+    img_ok = False
+    # 优先 Stable Diffusion，其次豆包，最后占位图
+    for gen_func in [generate_image_stable_diffusion,
+                     generate_image_doubao,
+                     generate_placeholder_image]:
+        if gen_func(image_prompt, img_path):
+            img_ok = True
+            break
+
+    media_path = ""
+    if img_ok and os.path.exists(img_path):
+        # 存相对路径，方便前端拼接 URL
+        rel_path = os.path.relpath(img_path, os.path.dirname(__file__))
+        media_path = rel_path.replace("\\", "/")
+
+    # 5. 存入缓存（result_type='image'）
+    cur.execute(
+        """INSERT INTO branch_results
+           (highlight_id, episode_id, branch_id, branch_text, ai_response, media_path, result_type, prompt_sent, token_usage)
+           VALUES (%s, %s, %s, %s, %s, %s, 'image', %s, %s)
+           ON DUPLICATE KEY UPDATE
+             ai_response=VALUES(ai_response), media_path=VALUES(media_path),
+             prompt_sent=VALUES(prompt_sent), token_usage=VALUES(token_usage),
+             result_type='image'""",
+        (
+            req.highlight_id,
+            episode_id,
+            req.branch_id,
+            branch_text,
+            ai_text,
+            media_path,
+            image_prompt,
+            ai_result["token_usage"],
+        ),
+    )
+
+    return {
+        "branch_id":   req.branch_id,
+        "text":         ai_text,
+        "image_url":    media_path,
+        "result_type":  "image",
+        "cached":       False,
+        "token_usage":  ai_result["token_usage"],
+    }
