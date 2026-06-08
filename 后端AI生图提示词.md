@@ -1,142 +1,274 @@
-================================================================================
-第67集 精选分支 AI 生图/视频 提示词方案
-================================================================================
-以下是从 25 个高光点中精选的 3 个最具代表性的分支节点，
-用于方案B（文生图）或方案C（预渲染视频）的内容生成。
+# DramaPulse 第67集 精选分支 AI 生图提示词
 
-每个分支都提供了：
-  - 高光点编号 + 时间戳
-  - 场景描述（发给AI生图的 prompt 用）
-  - 各选项的续写风格描述
-  - 建议的画面构图方向
+> 从 25 个高光点中精选 3 个最具代表性的分支节点，用于方案B（文生图）或方案C（预渲染视频）。
+>
+> **图片规格：竖屏 768×1344（9:16），适配手机端全屏显示**
+>
+> 提示词语言：中文（调用豆包文生图）/ 英文（调用 Stable Diffusion）均已提供
 
-================================================================================
-【精选分支一】HL#17 @ 04:30 (270s)
-================================================================================
-标签：第一个剧情分支（用户首次做选择，最具代表性）
+---
 
-── 场景信息 ────────────────────────────────────────────────────────────────
-场景描述：古墓内部幽暗暗室，冷光束聚焦的石砖地面上摆放着顶部压有厚重石块的密封古陶瓮，
-          周边环境漆黑朦胧
-情绪氛围：悬疑、阴森，充满未知压迫感
-角色状态：无人物（纯场景镜头，烘托未知神秘氛围）
+## 高光点 #17 — 时间 04:30（270秒）
 
-── 分支选项 ────────────────────────────────────────────────────────────────
-选项A：走左侧岔道
-选项B：走右侧岔道
-选项C：在岔口做标记
+**场景背景**
+古墓内部幽暗暗室，冷光束聚焦的石砖地面，压有厚重石块的密封古陶瓮，周边漆黑朦胧。
+主角站在岔道口，必须做出方向选择。
 
-── 发给 AI 生图的提示词（每个分支一张图）─────────────────────────────────
+**触发分支**：视频播放至 04:30 自动暂停，弹出三个选项。
 
-【选项A - 走左侧岔道】
-古墓探险场景，幽暗石砌岔道，左侧通道入口布满蛛网和青苔，
-手电光束照进黑暗深处隐约可见模糊人影或奇怪石刻，
-阴森悬疑氛围，冷色调，电影感，精细细节，512x512
+---
 
-【选项B - 走右侧岔道】
-古墓探险场景，右侧岔道，石壁上刻有古代壁画，
-壁画内容隐约描绘祭祀场景，手电光照在壁画上反射出诡异光泽，
-神秘悬疑氛围，暖色调（火光感），电影感，512x512
+### 选项 A — 走左侧岔道
 
-【选项C - 在岔口做标记】
-古墓探险场景，岔口石壁特写，角色用手中碎瓷片在石壁上刻下记号，
-刻痕清晰可见，旁边还有前人留下的模糊旧记号，
-细节丰富，悬疑氛围，冷暗色调，电影感，512x512
+**存储路径**：`frontend/branch_media/ep67/hl17_branchA.png`（方案B图片）
+**存储路径**：`frontend/branch_media/ep67/hl17_branchA.mp4`（方案C视频）
 
+**中文 prompt（豆包文生图）**
+```
+古墓探险竖版场景图，幽暗石砌岔道，左侧通道入口密布蛛网和青苔，
+手电光束斜射进黑暗深处，隐约可见石壁上的模糊古刻符文，
+前景是粗糙石砖地面，景深感强，
+阴森悬疑氛围，冷色调，电影感，精细细节，竖版构图，768x1344
+```
 
-================================================================================
-【精选分支二】HL#9 @ 02:15 (135s)
-================================================================================
-标签：情绪最强烈（错愕震惊），视觉效果强
+**英文 prompt（Stable Diffusion / SDXL）**
+```
+ancient tomb exploration scene, dark stone corridor, left passage entrance covered in 
+cobwebs and moss, flashlight beam piercing the darkness revealing faint ancient carvings, 
+rough stone floor in foreground, dramatic depth of field, eerie suspenseful atmosphere, 
+cool color tone, cinematic lighting, highly detailed, vertical composition, 768x1344
+```
 
-── 场景信息 ────────────────────────────────────────────────────────────────
-场景描述：昏暗幽暗的古墓内部空间，中央摆放着一座古老石棺椁
-情绪氛围：悬疑、惊奇、紧张
-角色状态：主角双手攥握在一起，视线看向画面侧方，
-          眉眼微蹙，嘴巴微张，脸上满是难以置信的错愕震惊神情
+---
 
-── 分支选项 ────────────────────────────────────────────────────────────────
-选项A：径直走向棺椁
-选项B：先检查四周陪葬品
-选项C：在入口观察不动
+### 选项 B — 走右侧岔道
 
-── 发给 AI 生图的提示词 ──────────────────────────────────────────────────
+**存储路径**：`frontend/branch_media/ep67/hl17_branchB.png` / `.mp4`
 
-【选项A - 径直走向棺椁】
-古墓探险场景，巨大石质棺椁特写，棺盖上有精美但残破的雕刻纹饰，
-手电光照在棺面上反射出诡异光泽，周围散落着破碎的陶片，
-主角背影正缓步走向棺椁，悬疑紧张氛围，暗色调，电影感，512x512
+**中文 prompt**
+```
+古墓探险竖版场景图，右侧岔道，石壁上密布古代壁画，
+壁画隐约描绘祭祀场景和神兽纹样，手电光照在壁画上反射出诡异光泽，
+地面散落陶片碎块，画面纵深拉长，
+神秘悬疑氛围，暖色调（火光感），电影感，竖版构图，768x1344
+```
 
-【选项B - 先检查四周陪葬品】
-古墓探险场景，棺椁前方的陪葬品特写，
+**英文 prompt**
+```
+ancient tomb corridor, right passageway, stone walls covered in ancient murals depicting 
+ritual scenes and mythical creatures, flashlight reflecting off mural surfaces with an 
+eerie glow, ceramic shards scattered on the ground, elongated depth, mysterious atmosphere, 
+warm candlelight tones, cinematic, vertical composition, 768x1344
+```
+
+---
+
+### 选项 C — 在岔口做标记
+
+**存储路径**：`frontend/branch_media/ep67/hl17_branchC.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，岔口石壁特写，男子侧脸低垂，
+手持碎瓷片在石壁上刻下记号，刻痕清晰可见，
+旁边已有前人留下的模糊旧记号，手电光照在刻字处，
+细节丰富，悬疑压抑氛围，冷暗色调，竖版构图，768x1344
+```
+
+**英文 prompt**
+```
+ancient tomb scene, close-up of stone wall at a crossroads, man carving a mark with 
+a broken ceramic shard, fresh scratches clearly visible, surrounded by older faded 
+markings left by previous explorers, flashlight illuminating the carvings, 
+rich detail, suspenseful dark atmosphere, cool dark tones, vertical composition, 768x1344
+```
+
+---
+
+## 高光点 #9 — 时间 02:15（135秒）
+
+**场景背景**
+昏暗的古墓内部，中央停着一座古老石棺椁。主角双手交握，眉蹙嘴微张，满脸错愕震惊神情。
+这是全集情绪强度最高的节点，视觉冲击力强。
+
+**触发分支**：视频播放至 02:15 自动暂停，弹出三个选项。
+
+---
+
+### 选项 A — 径直走向棺椁
+
+**存储路径**：`frontend/branch_media/ep67/hl9_branchA.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，巨大石质棺椁居画面中下方，
+棺盖上精美残破的雕刻纹饰清晰可见，
+手电光照在棺面上反射出诡异光泽，周围散落破碎陶片，
+主角背影出现在画面下方，缓步靠近棺椁，
+悬疑紧张氛围，暗色调，电影感，竖版构图，768x1344
+```
+
+**英文 prompt**
+```
+ancient tomb, massive stone sarcophagus in center-lower frame, intricate worn carvings 
+on the lid, flashlight reflecting an eerie glow from the surface, broken pottery shards 
+scattered around, silhouette of protagonist walking toward it from bottom of frame, 
+suspenseful tense atmosphere, dark tones, cinematic, vertical composition, 768x1344
+```
+
+---
+
+### 选项 B — 先检查四周陪葬品
+
+**存储路径**：`frontend/branch_media/ep67/hl9_branchB.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，棺椁前方的陪葬品特写，
 青铜器皿、破碎陶罐、生锈兵器散落一地，
-手电光照在青铜镜面上反射出光亮，精细文物细节，
-考古探险氛围，暖暗色调，电影感，512x512
+手电光照在青铜镜面上反射出强光，文物细节精细，
+画面从下向上延伸，棺椁轮廓在画面上方若隐若现，
+考古探险氛围，暖暗色调，竖版构图，768x1344
+```
 
-【选项C - 在入口观察不动】
-古墓探险场景，从墓室入口视角望向室内，
-石棺椁在房间尽头隐没在黑暗中，仅轮廓可见，
-强光手电光束从画面左下角射入，照亮空气中漂浮的尘埃颗粒，
-悬疑氛围，暗色调，广角镜头感，512x512
+**英文 prompt**
+```
+ancient tomb, close-up of burial objects before a sarcophagus, bronze vessels, 
+broken pottery, rusted weapons scattered on stone floor, flashlight reflecting off 
+a bronze mirror, intricate artifact details, composition extends upward with sarcophagus 
+silhouette faintly visible at top, archaeological atmosphere, warm dark tones, 
+vertical composition, 768x1344
+```
 
+---
 
-================================================================================
-【精选分支三】HL#23 @ 05:45 (345s)
-================================================================================
-标签：接近结尾的高潮分支（打开棺椁的终极选择）
+### 选项 C — 在入口观察不动
 
-── 场景信息 ────────────────────────────────────────────────────────────────
-场景描述：幽暗的砖石结构古墓内部空间，中央停放着一座棺椁
-情绪氛围：悬疑、紧张、压迫感极强
-角色状态：男子低头垂眼看向棺椁，嘴唇微张，
-          面部神情错愕紧绷，握着手电筒的手部微微用力
+**存储路径**：`frontend/branch_media/ep67/hl9_branchC.png` / `.mp4`
 
-── 分支选项 ────────────────────────────────────────────────────────────────
-选项A：打开棺椁
-选项B：绕行棺椁
-选项C：跪拜棺椁
+**中文 prompt**
+```
+古墓探险竖版场景图，从墓室入口向内看，
+石棺椁在画面远处深处的阴影中，仅轮廓依稀可辨，
+手电光束从画面底部射入，照亮空气中漂浮的尘埃颗粒，
+强烈纵深透视，悬疑氛围，暗色调，广角镜头感，竖版构图，768x1344
+```
 
-── 发给 AI 生图的提示词 ──────────────────────────────────────────────────
+**英文 prompt**
+```
+ancient tomb, view from entrance looking inward, stone sarcophagus barely visible as 
+a silhouette deep in shadows at the far end, flashlight beam from bottom illuminating 
+dust particles floating in the air, dramatic vanishing point perspective, suspenseful 
+atmosphere, dark tones, wide-angle lens feel, vertical composition, 768x1344
+```
 
-【选项A - 打开棺椁】
-古墓探险场景，石质棺椁特写，棺盖已被推开一条缝隙，
+---
+
+## 高光点 #23 — 时间 05:45（345秒）
+
+**场景背景**
+幽暗砖石古墓，中央棺椁。男子低头看棺，嘴唇微张，面部错愕紧绷，握手电筒的手略微用力。
+这是接近结尾的高潮节点——打开棺椁的终极选择。
+
+**触发分支**：视频播放至 05:45 自动暂停，弹出三个选项。
+
+---
+
+### 选项 A — 打开棺椁
+
+**存储路径**：`frontend/branch_media/ep67/hl23_branchA.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，石质棺椁特写，棺盖已被推开一条缝隙，
 缝隙中透出诡异的蓝绿色幽光，尘埃在空气中飞舞，
-手电和幽光交织照亮墓室，极度紧张氛围，
-对比强烈的光影，电影感，512x512
+手电和幽光交织照亮墓室，极度紧张压迫感，
+对比强烈的光影，电影感，竖版构图，768x1344
+```
 
-【选项B - 绕行棺椁】
-古墓探险场景，棺椁侧面视角，角色身影从棺椁旁绕行而过，
-石壁上的火把残迹依稀可见，地面铺满碎陶片，
-绕行路线在地上留下脚印，悬疑氛围，侧光构图，512x512
+**英文 prompt**
+```
+ancient tomb, close-up of stone sarcophagus, lid pushed open a crack, 
+eerie blue-green light emanating from within, dust motes floating in the air, 
+interplay of flashlight and ghostly light illuminating the chamber, 
+extreme tension and dread, high contrast lighting, cinematic, vertical composition, 768x1344
+```
 
-【选项C - 跪拜棺椁】
-古墓探险场景，角色跪拜在棺椁前的剪影，
-双手合十，低头行礼，背后的手电筒倒在地上发出微弱光照，
+---
+
+### 选项 B — 绕行棺椁
+
+**存储路径**：`frontend/branch_media/ep67/hl23_branchB.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，棺椁侧面视角，
+角色剪影从棺椁旁绕行而过，石壁上火把残迹依稀可见，
+地面碎陶片中留下脚印痕迹，悬疑氛围，
+侧光构图，竖版，暗色调，电影感，768x1344
+```
+
+**英文 prompt**
+```
+ancient tomb, side view of sarcophagus, silhouette of protagonist carefully moving 
+around it, faint traces of old torches on stone walls, footprints in ceramic shards 
+on the floor, suspenseful atmosphere, side lighting composition, dark tones, 
+cinematic, vertical composition, 768x1344
+```
+
+---
+
+### 选项 C — 跪拜棺椁
+
+**存储路径**：`frontend/branch_media/ep67/hl23_branchC.png` / `.mp4`
+
+**中文 prompt**
+```
+古墓探险竖版场景图，角色跪拜在棺椁前的剪影，
+双手合十，低头行礼，背后手电筒倒在地上发出微弱光照，
 棺椁在背景中沉默矗立，庄严神秘氛围，
-剪影构图，暗色调，电影感，512x512
+剪影构图，暗色调，电影感，竖版，768x1344
+```
 
+**英文 prompt**
+```
+ancient tomb, silhouette of a figure kneeling before a sarcophagus, hands clasped 
+in prayer, head bowed, flashlight dropped on the ground casting faint light, 
+sarcophagus standing silently in the background, solemn mysterious atmosphere, 
+silhouette composition, dark tones, cinematic, vertical composition, 768x1344
+```
 
-================================================================================
-使用说明
-================================================================================
+---
 
-【方案B：文生图（代码已实现）】
-将上述提示词直接复制，发给 Stable Diffusion / 豆包文生图 API，
-或在在线平台（如 civitai.com、leonardo.ai）手动生成后下载，
-放入 frontend/branch_media/ep67/ 目录，
-并在 branch_results 表中插入记录（result_type='image'）。
+## 使用说明
 
-【方案C：预渲染视频（提交代码已实现）】
-将上述3个分支的9张图，用剪映/可灵/Runway 做成短视频（5-10秒），
-视频内容：图片 + 缓慢推镜/摇镜 + 对应文字续写的旁白字幕，
-存为：
-  frontend/branch_media/ep67/hl17_branchA.mp4
-  frontend/branch_media/ep67/hl17_branchB.mp4
-  frontend/branch_media/ep67/hl17_branchC.mp4
-  frontend/branch_media/ep67/hl9_branchA.mp4
-  ...（共9个文件）
+### 方案 B（文生图，代码已实现）
 
-并在数据库中插入对应记录（result_type='video'），
-SQL 见 ai_branch_video_prepared.py 文件头部注释。
+1. 在 `.env` 中填入 `STABLE_DIFFUSION_API_KEY` 或 `DOUBAO_IMAGE_API_KEY`
+2. 重启后端服务
+3. 前端选择分支时，接口 `POST /ai/branch-with-image` 会自动生成图片
+4. 图片保存在 `backend/multimodal_assets/ep67/` 目录下
 
-================================================================================
+或手动生图（不需要代码接入）：
+- 复制上方对应的 prompt，在 [Leonardo.ai](https://leonardo.ai) / [Civitai](https://civitai.com) / 可灵 等平台生成
+- 导出为 768×1344 PNG，按下方路径命名存放
+
+### 方案 C（预渲染视频，代码已实现）
+
+1. 根据上方 prompt 生成场景图（或截取剧集画面），用剪映/可灵做成 5~15 秒短视频
+   - 建议加：缓慢推镜 + 对应续写文字的旁白字幕
+2. 视频命名规则（存入 `frontend/branch_media/ep67/`）：
+
+   | 文件名 | 对应节点 |
+   |--------|----------|
+   | `hl17_branchA.mp4` | HL#17 @ 04:30 — 走左侧岔道 |
+   | `hl17_branchB.mp4` | HL#17 @ 04:30 — 走右侧岔道 |
+   | `hl17_branchC.mp4` | HL#17 @ 04:30 — 在岔口做标记 |
+   | `hl9_branchA.mp4` | HL#9 @ 02:15 — 径直走向棺椁 |
+   | `hl9_branchB.mp4` | HL#9 @ 02:15 — 先检查四周陪葬品 |
+   | `hl9_branchC.mp4` | HL#9 @ 02:15 — 在入口观察不动 |
+   | `hl23_branchA.mp4` | HL#23 @ 05:45 — 打开棺椁 |
+   | `hl23_branchB.mp4` | HL#23 @ 05:45 — 绕行棺椁 |
+   | `hl23_branchC.mp4` | HL#23 @ 05:45 — 跪拜棺椁 |
+
+3. 往数据库插缓存记录：参考 `routes/ai_branch_video_prepared.py` 头部注释中的 SQL

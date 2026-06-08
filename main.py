@@ -21,7 +21,8 @@ from database import init_db
 from routes import episodes, analyze, ai_branch, ai_branch_image, ai_branch_video_prepared
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-VIDEO_DIR = Path(__file__).resolve().parent.parent
+VIDEO_DIR    = Path(__file__).resolve().parent.parent
+ASSETS_DIR   = Path(__file__).resolve().parent / "multimodal_assets"
 
 app = FastAPI(
     title="DramaPulse API",
@@ -41,6 +42,11 @@ app.add_middleware(
 # 托管前端静态文件（JS、CSS 等）
 if FRONTEND_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend-static")
+
+# 托管 AI 生成图片（multimodal_assets/）
+# 访问 URL：http://localhost:8000/assets/ep67/hl17_branchA.png
+ASSETS_DIR.mkdir(exist_ok=True)
+app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
 # 注册路由
 app.include_router(episodes.router)

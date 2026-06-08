@@ -32,14 +32,17 @@ STABLE_DIFFUSION_API_KEY = getattr(__import__("config", fromlist=["STABLE_DIFFUS
 DOUBAO_IMAGE_API_KEY   = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_API_KEY"]),   "DOUBAO_IMAGE_API_KEY",   "")
 DOUBAO_IMAGE_BASE_URL  = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_BASE_URL"]),  "DOUBAO_IMAGE_BASE_URL",  "https://ark.cn-beijing.volces.com/api/v3")
 
-# 生成的图片保存目录（相对于 backend/）
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "multimodal_assets")
+# 生成的图片保存目录：backend/multimodal_assets/
+# os.path.dirname(__file__) 是 routes/ 目录，需要上一级才是 backend/
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "multimodal_assets")
+ASSETS_DIR = os.path.normpath(ASSETS_DIR)
 os.makedirs(ASSETS_DIR, exist_ok=True)
 
-# 前端访问图片的 URL 前缀（根据实际情况修改）
-# 开发环境：http://localhost:8000/static/multimodal_assets
-# 生产环境：改为实际域名
-MEDIA_URL_PREFIX = "/static/multimodal_assets"
+# 前端访问图片的 URL 前缀
+# FastAPI 在 main.py 里挂载了 /static -> frontend/ 目录
+# 而 multimodal_assets 在 backend/ 下，所以需要单独挂载
+# 见 main.py 中 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+MEDIA_URL_PREFIX = "/assets"
 
 
 class BranchImageRequest(BaseModel):
@@ -71,8 +74,8 @@ def generate_image_stable_diffusion(prompt: str, output_path: str) -> bool:
     payload = {
         "text_prompts": [{"text": prompt, "weight": 1}],
         "cfg_scale":     7,
-        "height":        512,
-        "width":         512,
+        "height":        1344,   # 竖屏 9:16，适配手机端
+        "width":         768,
         "samples":       1,
         "steps":         30,
     }
@@ -107,7 +110,7 @@ def generate_image_doubao(prompt: str, output_path: str) -> bool:
     payload = {
         "model":  "doubao-image-generation-v2",  # 以实际模型 ID 为准
         "prompt": prompt,
-        "size":   "512x512",
+        "size":   "768x1344",   # 竖屏 9:16，适配手机端
         "n":      1,
     }
     try:
@@ -139,7 +142,7 @@ def generate_placeholder_image(prompt: str, output_path: str) -> bool:
     """
     try:
         from PIL import Image, ImageDraw, ImageFont
-        img = Image.new("RGB", (512, 512), color=(30, 30, 40))
+        img = Image.new("RGB", (768, 1344), color=(30, 30, 40))  # 竖屏 9:16
         draw = ImageDraw.Draw(img)
         # 尝试用系统字体，失败则用默认
         try:
@@ -157,7 +160,7 @@ def generate_placeholder_image(prompt: str, output_path: str) -> bool:
                 line = ""
         if line:
             lines.append(line)
-        y = 200
+        y = 560  # 竖屏居中偏上
         for ln in lines:
             draw.text((30, y), ln, fill=(200, 200, 180), font=font)
             y += 32
@@ -178,7 +181,7 @@ def build_image_prompt(scene_desc: str, branch_text: str, action_desc: str) -> s
         f"古墓探险场景，{scene_desc}，"
         f"角色正在{action_desc}，"
         f"观众选择了「{branch_text}」，"
-        f"暗调光线，悬疑氛围，电影感，精细细节，512x512"
+        f"暗调光线，悬疑氛围，电影感，精细细节，竖版构图，768x1344"
     )
 
 
@@ -270,9 +273,8 @@ def generate_story_branch_with_image(req: BranchImageRequest):
 
     media_path = ""
     if img_ok and os.path.exists(img_path):
-        # 存相对路径，方便前端拼接 URL
-        rel_path = os.path.relpath(img_path, os.path.dirname(__file__))
-        media_path = rel_path.replace("\\", "/")
+        # 存前端可访问的 URL 路径（/assets/ep67/文件名）
+        media_path = f"{MEDIA_URL_PREFIX}/ep{req.episode_no}/{img_filename}"
 
     # 5. 存入缓存（result_type='image'）
     cur.execute(
