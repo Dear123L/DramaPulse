@@ -44,5 +44,6 @@ DOUBAO_IMAGE_BASE_URL = os.getenv("DOUBAO_IMAGE_BASE_URL", "https://ark.cn-beiji
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 
-# 视频帧存储根目录
-FRAMES_BASE_DIR = os.getenv("FRAMES_BASE_DIR", r"D:\AI全栈\ep67-analysis\frames")
+# 视频帧存储根目录（默认为 backend/ 同级的 frames 目录，可在 .env 中覆盖）
+_DEFAULT_FRAMES_DIR = str(Path(__file__).resolve().parent.parent / "frames")
+FRAMES_BASE_DIR = os.getenv("FRAMES_BASE_DIR", _DEFAULT_FRAMES_DIR)

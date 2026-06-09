@@ -33,8 +33,8 @@ pip install -r requirements.txt
 #### 第 2 步：配置环境变量
 
 ```bash
-# 复制模板
-cp backend/.env.example backend/.env
+# 复制模板（在 backend/ 目录下执行）
+cp .env.example .env
 
 # 用记事本/VSCode 打开 .env，修改以下字段：
 ```
@@ -79,7 +79,7 @@ python run_create_tables.py
 python import_json_to_mysql.py
 ```
 
-从 `highlogs_67.json` 读取 25 个高光点写入数据库。导入完成后可用以下命令确认：
+从 `interaction_config_67.json` 读取 25 个高光点写入数据库。导入完成后可用以下命令确认：
 
 ```bash
 python list_highlights.py
@@ -89,13 +89,15 @@ python list_highlights.py
 
 #### 第 5 步：把视频文件放到正确位置
 
-将 `第67集.mp4`（或其他 mp4）放在：
+将 `第67集.mp4` 放在 backend 的**上级目录**（即 `ep67-analysis/` 根目录）：
 
 ```
-D:\AI全栈\ep67-analysis\第67集.mp4
+ep67-analysis/第67集.mp4
 ```
 
 后端 `/video/stream` 接口会自动扫描该目录下包含 `67` 字样的 mp4 文件。
+
+> ⚠️ 视频文件较大，不推送到 Git，clone 后需自行将视频放到此目录。
 
 ---
 
@@ -238,7 +240,7 @@ A：确认 MySQL 服务已启动（Windows：`net start mysql80`），并检查 
 A：豆包 API Key 失效或额度用完，去火山方舟控制台检查 Key 状态，更换后重启服务
 
 **Q：视频页面播放失败**
-A：确认 `第67集.mp4` 放在 `D:\AI全栈\ep67-analysis\` 目录下；或检查后端日志里 `/video/stream` 是否报 `video not found`
+A：确认 `第67集.mp4` 放在 `ep67-analysis/` 根目录（即 backend 的上级目录）；或检查后端日志里 `/video/stream` 是否报 `video not found`
 
 **Q：分支弹窗里方案B显示占位图不是真实图片**
 A：需要在 `.env` 里填入文生图 API Key，参考"方案B使用说明"
@@ -248,44 +250,44 @@ A：需要在 `.env` 里填入文生图 API Key，参考"方案B使用说明"
 ## 项目结构
 
 ```
-ep67-analysis/
-├── backend/                          # 后端服务（FastAPI + MySQL）
-│   ├── main.py                      # 服务入口，注册所有路由，托管前端静态文件
-│   ├── config.py                    # 配置中心：数据库/AI/服务端口等所有配置项
-│   ├── database.py                  # MySQL 连接管理（pymysql）
-│   ├── create_tables.sql            # 数据库建表 SQL（episodes / highlights / branch_results）
-│   ├── run_create_tables.py        # 执行建表脚本
-│   ├── ai_service.py               # 豆包 AI 封装：剧情续写 + 视频帧分析
-│   ├── analyze_video.py            # 视频分析：截帧 + 调用 AI 识别高光点
-│   ├── extract_audio.py            # 音频提取：用 ffmpeg 从视频中提取音频
-│   ├── fix_highlights.py           # 数据修复脚本：修正高光点 show_branch 分布和 branch_options
-│   ├── list_highlights.py          # 查看所有高光点列表（辅助脚本）
-│   ├── 后端AI生图提示词.md        # 精选分支的 AI 生图提示词（发给 AI 用）
-│   ├── routes/
-│   │   ├── episodes.py            # 剧集管理路由：GET /episodes, /episodes/{no}/highlights
-│   │   ├── analyze.py             # 视频分析路由：POST /analyze, /analyze/async
-│   │   ├── ai_branch.py           # 【方案A】AI 文字续写：POST /ai/branch（纯文字，当前主用）
-│   │   ├── ai_branch_image.py     # 【方案B】文字续写 + AI 文生图：POST /ai/branch-with-image
-│   │   └── ai_branch_video_prepared.py  # 【方案C】预渲染视频分支：POST /ai/branch-video
-│   ├── multimodal_assets/         # AI 生成的多媒体资源存储目录
-│   │   └── ep67/                 # 第67集的 AI 生成图片
-│   └── requirements.txt            # Python 依赖清单
-│
-├── frontend/                       # 前端验证页（纯 HTML+CSS+JS，无框架）
-│   ├── index.html                  # 验证页主页面：视频播放 + 高光点列表 + 分支弹窗
-│   ├── app.js                     # 前端核心逻辑：播放控制、特效触发、分支选择、AI续写调用
-│   └── branch_media/              # 预渲染分支视频存放目录（方案C用）
-│       └── ep67/                  # 第67集的分支视频（hl{id}_branch{A/B/C}.mp4）
-│
-├── frames_67/                      # 第67集截帧图片输出目录（analyze_video.py 生成）
-├── 第67集.mp4                      # 第67集视频文件（分析用）
-├── extract_and_analyze_ep67.py     # 一键执行：截帧 + AI分析 + 写入数据库
-├── rebuild_ep67_output.py         # 重建输出：重新生成 interaction_config 和 highlights JSON
-├── highlogs_67.json               # 第67集高光点数据（JSON 备份）
-├── interaction_config_67.json      # 第67集互动配置文件（供 App 使用）
-├── analysis_report_67.txt         # 第67集分析报告（文字版）
-└── 后端AI生图提示词.md             # 精选分支的 AI 生图提示词（发给 AI 用）
+backend/                                  # 后端服务（Git 仓库根目录）
+├── main.py                               # 服务入口，注册所有路由，托管前端静态文件
+├── config.py                             # 配置中心：数据库/AI/服务端口等所有配置项
+├── database.py                           # MySQL 连接管理（pymysql）
+├── models.py                             # Pydantic 数据模型
+├── ai_service.py                         # 豆包 AI 封装：剧情续写 + 视频帧分析
+├── analyzer.py                           # 高光点分析逻辑
+├── create_tables.sql                     # 数据库建表 SQL（episodes / highlights / branch_results）
+├── run_create_tables.py                  # 执行建表脚本
+├── import_json_to_mysql.py               # 导入高光点数据（读取 interaction_config_67.json）
+├── import_images_to_db.py                # 把预渲染图片写入 branch_results 缓存
+├── fix_highlights.py                     # 数据修复脚本：修正高光点分布和分支选项
+├── list_highlights.py                    # 查看所有高光点列表（辅助脚本）
+├── alter_branch_results.py               # 给 branch_results 表安全加字段（迁移脚本）
+├── update_branch_text.py                 # 更新分支续写文字内容
+├── interaction_config_67.json            # 第67集互动配置（高光点数据源）
+├── highlights_67.json                    # 第67集高光点备份
+├── requirements.txt                      # Python 依赖清单
+├── .env.example                          # 环境变量模板（.env 本体不推送）
+├── .gitignore                            # Git 忽略规则
+├── 后端AI生图提示词.md                    # 精选分支的 AI 生图提示词
+├── 技术文档.md                            # 项目技术文档
+├── README.md                             # 本文件
+├── routes/
+│   ├── episodes.py                       # 剧集管理路由：GET /episodes, /episodes/{no}/highlights
+│   ├── analyze.py                        # 视频分析路由：POST /analyze
+│   ├── ai_branch.py                      # 【方案A】AI 文字续写：POST /ai/branch
+│   ├── ai_branch_image.py                # 【方案B】文字+AI文生图：POST /ai/branch-with-image
+│   └── ai_branch_video_prepared.py       # 【方案C】预渲染视频分支：POST /ai/branch-video
+├── frontend/                             # 前端验证页（随后端一起部署）
+│   ├── index.html                        # 验证页主页面：视频播放 + 高光点 + 分支弹窗
+│   ├── app.js                            # 前端核心逻辑：播放控制、特效、分支选择、AI续写
+│   └── branch_media/
+│       └── ep67/                         # 预渲染分支视频存放目录（hl{id}_branch{A/B/C}.mp4）
+└── multimodal_assets/
+    └── ep67/                             # 预渲染分支图片（hl{id}_branch{A/B/C}.png，已入库）
 
+# 注：第67集.mp4 放在 backend 上级目录（ep67-analysis/），不推送到 Git
 ```
 
 ---
@@ -367,8 +369,8 @@ ep67-analysis/
 ### 初始化步骤
 
 ```bash
-# 1. 复制模板
-cp backend/.env.example backend/.env
+# 1. 复制模板（在 backend/ 目录下执行）
+cp .env.example .env
 
 # 2. 编辑 .env，填入你自己的 Key
 #    必填：AI_API_KEY、MYSQL_PASSWORD
@@ -394,8 +396,7 @@ STABLE_DIFFUSION_API_KEY=sk-xxxxxxxxxxxxxxxx  # 选填
 ## 快速启动
 
 ```bash
-# 1. 安装依赖
-cd backend
+# 1. 安装依赖（在 backend/ 目录下执行）
 pip install -r requirements.txt
 
 # 2. 复制并填写环境变量
@@ -405,11 +406,14 @@ cp .env.example .env
 # 3. 建表
 python run_create_tables.py
 
-# 4. 启动服务
+# 4. 导入第67集数据
+python import_json_to_mysql.py
+
+# 5. 启动服务
 python main.py
 # 服务运行在 http://localhost:8000
 
-# 5. 打开前端验证页
+# 6. 打开前端验证页
 # 浏览器访问：http://localhost:8000/player
 ```
 

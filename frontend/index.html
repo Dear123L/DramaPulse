@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DramaPulse 高光点验证页</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI','Microsoft YaHei',sans-serif; background:#0d1117; color:#c9d1d9; height:100vh; overflow:hidden; }
+
+.top-bar { display:flex; align-items:center; gap:10px; padding:10px 20px; background:#161b22; border-bottom:1px solid #30363d; flex-wrap:wrap; }
+.top-bar label { font-size:13px; color:#8b949e; white-space:nowrap; }
+.top-bar input[type="text"] { background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 10px; border-radius:6px; font-size:13px; width:200px; }
+.top-bar input[type="number"] { background:#0d1117; border:1px solid #30363d; color:#c9d1d9; padding:6px 10px; border-radius:6px; font-size:13px; width:60px; }
+.btn { padding:7px 16px; border:none; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600; transition:opacity 0.2s; }
+.btn:hover { opacity:0.85; }
+.btn-primary { background:#238636; color:#fff; }
+.btn-secondary { background:#30363d; color:#c9d1d9; }
+#status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; background:#3fb950; }
+#status-text { font-size:12px; color:#8b949e; margin-left:6px; }
+
+.main { display:flex; height:calc(100vh - 52px - 160px); overflow:hidden; }
+
+.video-panel { flex:1; padding:16px; display:flex; flex-direction:column; gap:10px; min-width:0; position:relative; }
+.video-wrapper { position:relative; width:100%; background:#000; border-radius:10px; overflow:hidden; aspect-ratio:16/9; max-height:100%; }
+.video-wrapper video { width:100%; height:100%; object-fit:contain; }
+.effect-overlay { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+
+.flashlight-flicker { position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse at 30% 50%, rgba(255,200,50,0.6) 0%, transparent 70%); animation:flicker 0.15s infinite alternate; pointer-events:none; }
+@keyframes flicker { 0% { opacity:0.3; transform:scale(1); } 50% { opacity:0.9; transform:scale(1.05); } 100% { opacity:0.2; transform:scale(0.98); } }
+
+.heartbeat-pulse { position:absolute; top:0; left:0; width:100%; height:100%; border:3px solid rgba(255,40,40,0.7); border-radius:10px; animation:heartbeat 0.8s ease-in-out infinite; pointer-events:none; box-shadow:0 0 30px rgba(255,0,0,0.3), inset 0 0 30px rgba(255,0,0,0.1); }
+@keyframes heartbeat { 0%,100% { transform:scale(1); border-color:rgba(255,40,40,0.4); } 50% { transform:scale(1.03); border-color:rgba(255,40,40,0.9); } }
+
+.dark-fog { position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%); animation:fogBreath 3s ease-in-out infinite alternate; pointer-events:none; }
+@keyframes fogBreath { 0% { opacity:0.4; } 100% { opacity:0.85; } }
+
+.dust-particle { position:absolute; border-radius:50%; pointer-events:none; z-index:11; }
+
+.video-controls { display:flex; align-items:center; gap:10px; padding:8px 0; flex-wrap:wrap; }
+.video-controls label { font-size:12px; color:#8b949e; }
+.video-controls input[type="file"] { font-size:12px; color:#8b949e; }
+
+.side-panel { width:340px; background:#161b22; border-left:1px solid #30363d; display:flex; flex-direction:column; overflow:hidden; }
+.side-header { padding:12px 16px; font-size:14px; font-weight:600; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; align-items:center; }
+.side-header .count { background:#238636; color:#fff; font-size:11px; padding:2px 8px; border-radius:10px; }
+.highlight-list { flex:1; overflow-y:auto; padding:8px; }
+.hl-card { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:10px 12px; margin-bottom:6px; font-size:12px; transition:border-color 0.3s, background 0.3s; }
+.hl-card.triggered { border-color:#238636; background:rgba(35,134,54,0.08); }
+.hl-card .hl-time { font-weight:700; color:#58a6ff; font-size:13px; }
+.hl-card .hl-type { color:#8b949e; margin-left:6px; }
+.hl-card .hl-tags { margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; }
+.hl-tag { font-size:10px; padding:1px 6px; border-radius:4px; background:#21262d; color:#8b949e; }
+.hl-tag.effect { background:#1f4e79; color:#58a6ff; }
+.hl-tag.branch { background:#3a1f4e; color:#d2a8ff; }
+.hl-card .hl-desc { margin-top:4px; color:#8b949e; font-size:11px; line-height:1.4; }
+
+.log-panel { height:160px; background:#161b22; border-top:1px solid #30363d; display:flex; flex-direction:column; overflow:hidden; }
+.log-header { padding:6px 16px; font-size:12px; font-weight:600; border-bottom:1px solid #30363d; display:flex; justify-content:space-between; align-items:center; }
+.log-header .clear-log { font-size:11px; background:none; border:none; color:#8b949e; cursor:pointer; }
+.log-header .clear-log:hover { color:#c9d1d9; }
+.log-content { flex:1; overflow-y:auto; padding:6px 16px; font-size:12px; font-family:'Consolas','Courier New',monospace; }
+.log-line { padding:2px 0; border-bottom:1px solid rgba(33,38,45,0.13); }
+.log-line .log-time { color:#8b949e; margin-right:8px; }
+.log-line.log-info .log-msg { color:#58a6ff; }
+.log-line.log-trigger .log-msg { color:#3fb950; }
+.log-line.log-branch .log-msg { color:#d2a8ff; }
+.log-line.log-effect .log-msg { color:#f0883e; }
+.log-line.log-error .log-msg { color:#f85149; }
+
+.modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1000; justify-content:center; align-items:center; }
+.modal-overlay.active { display:flex; }
+.modal { background:#161b22; border:1px solid #30363d; border-radius:12px; width:420px; max-width:90vw; padding:24px; box-shadow:0 0 60px rgba(0,0,0,0.5); }
+.modal h3 { font-size:16px; margin-bottom:6px; color:#c9d1d9; }
+.modal .modal-subtitle { font-size:12px; color:#8b949e; margin-bottom:16px; }
+.modal .branch-options { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.modal .branch-btn { display:block; width:100%; text-align:left; padding:10px 14px; background:#21262d; border:1px solid #30363d; border-radius:8px; color:#c9d1d9; font-size:13px; cursor:pointer; transition:background 0.2s; }
+.modal .branch-btn:hover { background:#30363d; border-color:#58a6ff; }
+.modal .branch-btn .opt-label { font-weight:700; color:#58a6ff; margin-right:8px; }
+.modal .ai-response { background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:12px; font-size:13px; line-height:1.6; color:#c9d1d9; min-height:60px; margin-bottom:16px; white-space:pre-wrap; }
+.modal .modal-actions { display:flex; justify-content:flex-end; gap:8px; }
+.modal .btn-resume { background:#238636; color:#fff; padding:8px 20px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <label>API 地址</label>
+    <input type="text" id="api-base" value="http://localhost:8000" />
+    <label>剧集</label>
+    <input type="number" id="episode-no" value="67" min="1" />
+    <button class="btn btn-primary" onclick="loadHighlights()">加载高光点</button>
+    <button class="btn btn-secondary" onclick="resetTriggered()">重置触发</button>
+    <span id="status-dot"></span>
+    <span id="status-text">就绪</span>
+</div>
+
+<div class="main">
+    <div class="video-panel">
+        <div class="video-wrapper" id="video-wrapper">
+            <video id="video-player" controls style="width:100%;height:100%;object-fit:contain;">
+                您的浏览器不支持 video 标签
+            </video>
+            <div class="effect-overlay" id="effect-overlay"></div>
+        </div>
+        <div class="video-controls">
+            <label>选择视频文件：</label>
+            <input type="file" id="video-file" accept="video/*" onchange="onVideoSelected(event)" />
+            <span id="video-name" style="font-size:12px;color:#8b949e;"></span>
+            <button class="btn btn-secondary" style="margin-left:8px;" onclick="loadServerVideo()">从服务器加载第67集</button>
+        </div>
+    </div>
+
+    <div class="side-panel">
+        <div class="side-header">
+            <span>高光点列表</span>
+            <span class="count" id="hl-count">0 个</span>
+        </div>
+        <div class="highlight-list" id="highlight-list">
+            <div style="color:#8b949e;font-size:12px;padding:20px;text-align:center;">
+                请先点击「加载高光点」<br>加载剧集的高光点配置
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="log-panel">
+    <div class="log-header">
+        <span>触发日志</span>
+        <button class="clear-log" onclick="clearLog()">清空日志</button>
+    </div>
+    <div class="log-content" id="log-content"></div>
+</div>
+
+<div class="modal-overlay" id="branch-modal">
+    <div class="modal">
+        <h3 id="modal-title">剧情分支选择</h3>
+        <div class="modal-subtitle" id="modal-subtitle">请选择一个方向，剧情将为你续写</div>
+        <div class="branch-options" id="branch-options"></div>
+        <div class="ai-response" id="ai-response"></div>
+        <!-- 方案B：AI配图展示区 -->
+        <div class="ai-image" id="ai-image" style="display:none;margin-bottom:16px;text-align:center;">
+            <img id="ai-image-img" src="" style="max-width:100%;border-radius:8px;border:1px solid #30363d;" />
+        </div>
+        <!-- 方案C：分支视频播放区 -->
+        <div class="branch-video-wrap" id="branch-video-wrap" style="display:none;margin-bottom:16px;">
+            <video id="branch-video" controls style="width:100%;border-radius:8px;"></video>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-resume" id="btn-resume" style="display:none;" onclick="resumeVideo()">继续播放 ▶</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

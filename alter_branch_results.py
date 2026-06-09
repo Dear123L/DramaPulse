@@ -4,7 +4,7 @@ alter_branch_results.py
 不会删除已有数据，安全执行。
 
 运行方式：
-    cd D:\AI全栈\ep67-analysis\backend
+    cd <项目根目录>/backend
     python alter_branch_results.py
 """
 import pymysql

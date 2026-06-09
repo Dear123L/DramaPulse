@@ -4,7 +4,7 @@ DramaPulse 后台服务入口
 FastAPI + MySQL + 豆包AI
 
 启动方式:
-    cd D:\AI全栈\ep67-analysis\backend
+    cd <项目根目录>/backend
     python main.py
 
 API文档:

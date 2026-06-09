@@ -6,7 +6,7 @@ import_images_to_db.py
 例：hl17_branchA.png  → highlight_id=17, branch_id='A'
 
 运行方式：
-    cd D:\AI全栈\ep67-analysis\backend
+    cd <项目根目录>/backend
     python import_images_to_db.py
 """
 

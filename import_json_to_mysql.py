@@ -1,20 +1,29 @@
 """
 import_json_to_mysql.py
 把 interaction_config_67.json 的数据导入 MySQL highlights 表
+数据库配置从同目录 .env 文件读取，未设置时使用默认值
 """
-import json, pymysql
+import json, pymysql, os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+except ImportError:
+    pass
 
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "root",
-    "database": "drama_pulse",
+    "host": os.getenv("MYSQL_HOST", "127.0.0.1"),
+    "port": int(os.getenv("MYSQL_PORT", "3306")),
+    "user": os.getenv("MYSQL_USER", "root"),
+    "password": os.getenv("MYSQL_PASSWORD", ""),
+    "database": os.getenv("MYSQL_DATABASE", "drama_pulse"),
     "charset": "utf8mb4",
     "autocommit": True,
 }
 
-CONFIG_FILE = r"D:\AI全栈\ep67-analysis\interaction_config_67.json"
+# 使用相对于本脚本的路径，确保从 backend/ 目录运行时可正确找到文件
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "interaction_config_67.json")
 
 
 def main():

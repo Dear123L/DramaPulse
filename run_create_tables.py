@@ -1,18 +1,32 @@
 """
 run_create_tables.py
-读取 create_tables.sql 并在 MySQL (root/root @ localhost:3306) 上执行
+读取 create_tables.sql 并在 MySQL 上执行。
+数据库配置从同目录 .env 文件读取，未设置时使用默认值。
 """
 import pymysql
 import re
+import os
+from pathlib import Path
 
-SQL_FILE = "create_tables.sql"
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+except ImportError:
+    pass
+
+# SQL 文件使用相对于本脚本的路径，从任意目录运行均可
+SQL_FILE = str(Path(__file__).resolve().parent / "create_tables.sql")
+
 DB_CONFIG = {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "user": "root",
-    "password": "root",
+    "host": os.getenv("MYSQL_HOST", "127.0.0.1"),
+    "port": int(os.getenv("MYSQL_PORT", "3306")),
+    "user": os.getenv("MYSQL_USER", "root"),
+    "password": os.getenv("MYSQL_PASSWORD", ""),
     "charset": "utf8mb4",
 }
+
+# 数据库名也从环境变量读取
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "drama_pulse")
 
 def read_sql_statements(filepath):
     """读取SQL文件，返回语句列表（正确处理括号嵌套）"""
@@ -69,7 +83,7 @@ def main():
                 print(f"       SQL: {preview}")
 
     # 验证表已创建
-    cursor.execute("SHOW TABLES FROM drama_pulse")
+    cursor.execute(f"SHOW TABLES FROM {MYSQL_DATABASE}")
     tables = [t[0] for t in cursor.fetchall()]
     print(f"\n建表完成，共 {len(tables)} 张表: {tables}")
 
@@ -87,9 +101,9 @@ def main():
 
     # 最终验证
     for t in tables:
-        cursor.execute(f"SELECT COUNT(*) FROM drama_pulse.{t}")
+        cursor.execute(f"SELECT COUNT(*) FROM {MYSQL_DATABASE}.{t}")
         cnt = cursor.fetchone()[0]
-        print(f"  drama_pulse.{t}: {cnt} 行")
+        print(f"  {MYSQL_DATABASE}.{t}: {cnt} 行")
 
     cursor.close()
     conn.close()
