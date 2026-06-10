@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pathlib import Path
 
 from database import init_db
-from routes import episodes, analyze, ai_branch, ai_branch_image, ai_branch_video_prepared
+from routes import episodes, analyze, ai_branch, ai_branch_image, ai_branch_video_prepared, ai_branch_options
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 VIDEO_DIR    = Path(__file__).resolve().parent
@@ -54,6 +54,7 @@ app.include_router(analyze.router)
 app.include_router(ai_branch.router)
 app.include_router(ai_branch_image.router)           # 方案B：文生图
 app.include_router(ai_branch_video_prepared.router)  # 方案C：预渲染视频
+app.include_router(ai_branch_options.router)          # AI生成分支选项
 
 
 @app.get("/", tags=["health"])
