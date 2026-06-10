@@ -260,29 +260,25 @@ def generate_story_branch_with_image(req: BranchImageRequest):
     )
     ai_text = ai_result["text"]
 
-    # 4. 调用文生图
-    image_prompt = build_image_prompt(scene_desc, branch_text, highlight.get("action_desc", ""))
-    episode_assets_dir = os.path.join(ASSETS_DIR, f"ep{req.episode_no}")
-    os.makedirs(episode_assets_dir, exist_ok=True)
-    img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
-    img_path     = os.path.join(episode_assets_dir, img_filename)
-
-    img_ok = False
-    # 优先 Stable Diffusion，其次豆包，最后占位图
-    for gen_func in [generate_image_stable_diffusion,
-                     generate_image_doubao,
-                     generate_placeholder_image]:
-        if gen_func(image_prompt, img_path):
-            img_ok = True
-            break
-
-    media_path = ""
-    if img_ok and os.path.exists(img_path):
-        # 存数据库用相对路径（/assets/ep67/文件名）
-        media_path = f"{MEDIA_URL_PREFIX}/ep{req.episode_no}/{img_filename}"
+    # 4. 随机从预设图片池选一张（不生成黑底白字占位图）
+    import random
+    PRESET_POOL = [
+        "/assets/ep67/hl5_branchA_1781094085.png",
+        "/assets/ep67/hl9_branchA.png",
+        "/assets/ep67/hl9_branchB.png",
+        "/assets/ep67/hl9_branchC.png",
+        "/assets/ep67/hl17_branchA.png",
+        "/assets/ep67/hl17_branchB.png",
+        "/assets/ep67/hl17_branchC.png",
+        "/assets/ep67/hl23_branchA.png",
+        "/assets/ep67/hl23_branchB.png",
+        "/assets/ep67/hl23_branchC.png",
+    ]
+    media_path = random.choice(PRESET_POOL)
+    print(f"[ImageGen] 无缓存，随机分配预设图：{media_path}")
 
     # 返回给前端时拼接完整URL
-    image_url = f"{SERVER_BASE_URL}{media_path}" if (SERVER_BASE_URL and media_path) else (media_path or "")
+    image_url = f"{SERVER_BASE_URL}{media_path}" if SERVER_BASE_URL else media_path
 
     # 5. 存入缓存（result_type='image'）
     cur.execute(
@@ -300,7 +296,7 @@ def generate_story_branch_with_image(req: BranchImageRequest):
             branch_text,
             ai_text,
             media_path,
-            image_prompt,
+            "",          # prompt_sent 不再生成图片，留空
             ai_result["token_usage"],
         ),
     )
