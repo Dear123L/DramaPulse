@@ -20,8 +20,8 @@ from pathlib import Path
 from database import init_db
 from routes import episodes, analyze, ai_branch, ai_branch_image, ai_branch_video_prepared
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-VIDEO_DIR    = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
+VIDEO_DIR    = Path(__file__).resolve().parent
 ASSETS_DIR   = Path(__file__).resolve().parent / "multimodal_assets"
 
 app = FastAPI(
@@ -73,12 +73,19 @@ def serve_player():
 
 @app.get("/video/stream", tags=["frontend"])
 def serve_video():
-    """提供第67集视频文件流"""
-    # 按编号查找所有 mp4 文件
-    for f in VIDEO_DIR.iterdir():
-        if f.suffix.lower() == ".mp4" and "67" in f.stem:
-            return FileResponse(str(f), media_type="video/mp4")
-    return {"error": "video not found"}
+    """提供第67集视频文件流。
+    查找顺序：
+    1. backend/ 目录内（和 main.py 同级）
+    2. backend/ 的上级目录（兼容本地开发时视频放在 ep67-analysis/ 根目录的情况）
+    """
+    search_dirs = [VIDEO_DIR, VIDEO_DIR.parent]
+    for d in search_dirs:
+        if not d.is_dir():
+            continue
+        for f in d.iterdir():
+            if f.suffix.lower() == ".mp4" and "67" in f.stem:
+                return FileResponse(str(f), media_type="video/mp4")
+    return {"error": "video not found, please place 第67集.mp4 in backend/ directory"}
 
 
 @app.get("/api/summary", tags=["health"])
