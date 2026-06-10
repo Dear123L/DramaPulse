@@ -1,0 +1,627 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "DramaPulse API",
+    "description": "短剧互动激发平台后台服务 —— 基于AI的剧情高光点分析与互动配置生成",
+    "version": "1.0.0",
+    "contact": {
+      "name": "DramaPulse Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "本地开发服务器"
+    }
+  ],
+  "tags": [
+    { "name": "health", "description": "健康检查 & 前端页面" },
+    { "name": "episodes", "description": "剧集管理" },
+    { "name": "ai", "description": "AI 剧情分支续写（方案A：纯文字）" },
+    { "name": "ai-image", "description": "AI 分支续写 + 文生图（方案B）" },
+    { "name": "ai-video-prepared", "description": "预渲染分支视频（方案C）" },
+    { "name": "analyze", "description": "视频分析" }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["health"],
+        "summary": "健康检查",
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "description": "服务正常",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "service": { "type": "string", "example": "DramaPulse API" },
+                    "version": { "type": "string", "example": "1.0.0" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/player": {
+      "get": {
+        "tags": ["health"],
+        "summary": "前端验证页",
+        "operationId": "serve_player",
+        "responses": {
+          "200": {
+            "description": "返回 HTML 页面",
+            "content": { "text/html": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/api/summary": {
+      "get": {
+        "tags": ["health"],
+        "summary": "API 接口摘要",
+        "operationId": "api_summary",
+        "responses": {
+          "200": {
+            "description": "返回所有可用接口列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "endpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "method": { "type": "string" },
+                          "path": { "type": "string" },
+                          "desc": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/stream": {
+      "get": {
+        "tags": ["health"],
+        "summary": "获取第67集视频流",
+        "operationId": "serve_video",
+        "responses": {
+          "200": {
+            "description": "返回视频文件流",
+            "content": { "video/mp4": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "404": {
+            "description": "视频文件未找到"
+          }
+        }
+      }
+    },
+    "/episodes": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取所有剧集列表",
+        "operationId": "list_episodes",
+        "responses": {
+          "200": {
+            "description": "剧集列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/EpisodeBrief" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/episodes/{episode_no}": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取指定剧集信息",
+        "operationId": "get_episode",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号，如 67",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "剧集详情",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EpisodeBrief" }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集不存在"
+          }
+        }
+      }
+    },
+    "/episodes/{episode_no}/highlights": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取某集所有高光点（App 核心接口）",
+        "operationId": "get_highlights",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号，如 67",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "高光点列表",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HighlightListResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集不存在"
+          }
+        }
+      }
+    },
+    "/episodes/{episode_no}/highlights/{highlight_id}": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取单个高光点详情",
+        "operationId": "get_highlight",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号，如 67",
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "highlight_id",
+            "in": "path",
+            "required": true,
+            "description": "高光点 ID",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "高光点详情",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Highlight" }
+              }
+            }
+          },
+          "404": {
+            "description": "高光点不存在"
+          }
+        }
+      }
+    },
+    "/ai/branch": {
+      "post": {
+        "tags": ["ai"],
+        "summary": "AI 生成剧情分支续写（方案A：纯文字）",
+        "description": "根据高光点上下文和用户选择的分支，调用豆包AI生成剧情续写。结果会缓存到 branch_results 表。\n\n⚠️ 注意：数据库里第67集高光点 id 范围是 51~75，不是 1~25。请先调用 GET /episodes/67/highlights 获取真实 id。",
+        "operationId": "generate_story_branch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BranchRequest" },
+              "example": {
+                "episode_no": 67,
+                "highlight_id": 51,
+                "branch_id": "A",
+                "branch_text": "探查前方暗道"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI 续写结果",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BranchTextResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集或高光点不存在"
+          }
+        }
+      }
+    },
+    "/ai/branch-with-image": {
+      "post": {
+        "tags": ["ai-image"],
+        "summary": "AI 生成剧情分支续写 + 文生图（方案B）",
+        "description": "与 /ai/branch 类似，但额外生成一张文生图。需要配置 STABLE_DIFFUSION_API_KEY 或 DOUBAO_IMAGE_API_KEY。无 Key 时自动生成占位图。",
+        "operationId": "generate_story_branch_with_image",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BranchRequest" },
+              "example": {
+                "episode_no": 67,
+                "highlight_id": 51,
+                "branch_id": "A",
+                "branch_text": "探查前方暗道"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI 续写 + 图片路径",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BranchImageResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集或高光点不存在"
+          }
+        }
+      }
+    },
+    "/ai/branch-video": {
+      "post": {
+        "tags": ["ai-video-prepared"],
+        "summary": "获取预渲染分支视频（方案C）",
+        "description": "返回预渲染视频路径。优先读缓存（result_type=video），无缓存返回404让前端 fallback。",
+        "operationId": "get_prepared_branch_video",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BranchRequest" },
+              "example": {
+                "episode_no": 67,
+                "highlight_id": 17,
+                "branch_id": "A",
+                "branch_text": "探查左侧暗道"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "预渲染视频信息",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BranchVideoResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "无预渲染内容"
+          }
+        }
+      }
+    },
+    "/ai/branch-video/{episode_no}/{highlight_id}/{branch_id}": {
+      "get": {
+        "tags": ["ai-video-prepared"],
+        "summary": "直接返回分支视频文件",
+        "operationId": "serve_branch_video",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "highlight_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "branch_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回视频文件",
+            "content": { "video/mp4": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "404": {
+            "description": "视频文件不存在"
+          }
+        }
+      }
+    },
+    "/ai/branch-video/list": {
+      "get": {
+        "tags": ["ai-video-prepared"],
+        "summary": "列出所有预渲染分支视频",
+        "operationId": "list_prepared_videos",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "query",
+            "required": false,
+            "description": "按剧集编号过滤",
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "视频文件列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "videos": { "type": "array" },
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyze": {
+      "post": {
+        "tags": ["analyze"],
+        "summary": "触发视频分析（同步，需2-5分钟）",
+        "description": "触发一集完整分析：截帧 → 豆包视觉AI逐帧分析 → 生成互动配置 → 存入MySQL。同步阻塞。",
+        "operationId": "start_analysis",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnalyzeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "分析完成",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AnalyzeResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "视频文件不存在"
+          },
+          "500": {
+            "description": "分析失败"
+          }
+        }
+      }
+    },
+    "/analyze/async": {
+      "post": {
+        "tags": ["analyze"],
+        "summary": "触发视频分析（异步，立即返回）",
+        "description": "异步版本：立即返回任务ID，后台执行分析。通过 GET /episodes/{episode_no} 轮询状态。",
+        "operationId": "start_analysis_async",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnalyzeRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "任务已提交",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "episode_no": { "type": "integer" },
+                    "status": { "type": "string", "example": "analyzing" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "视频文件不存在"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EpisodeBrief": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "description": "剧集主键" },
+          "episode_no": { "type": "integer", "description": "剧集编号" },
+          "title": { "type": "string", "description": "剧集标题" },
+          "theme": { "type": "string", "description": "主题标签" },
+          "total_duration": { "type": "integer", "description": "视频总时长（秒）" },
+          "status": { "type": "string", "enum": ["pending", "analyzing", "done", "failed"], "description": "分析状态" },
+          "highlight_count": { "type": "integer", "description": "高光点总数" }
+        }
+      },
+      "Highlight": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "description": "高光点主键（调用 /ai/branch 时需要）" },
+          "timestamp": { "type": "integer", "description": "触发时间（秒）" },
+          "type": { "type": "string", "description": "场景类型：悬疑/恐惧/危机等" },
+          "intensity": { "type": "integer", "description": "情绪强度 1~10" },
+          "emotion": { "type": "string", "description": "情绪描述" },
+          "scene_desc": { "type": "string", "description": "场景描述" },
+          "action_desc": { "type": "string", "description": "角色动作描述" },
+          "trigger": { "type": "object", "description": "触发配置 JSON" },
+          "visual_effect": { "type": "string", "description": "视觉特效类型" },
+          "particle_type": { "type": "string", "description": "粒子特效类型" },
+          "haptic_pattern": { "type": "string", "description": "震动类型" },
+          "audio_cue": { "type": "string", "description": "音效提示" },
+          "show_branch": { "type": "boolean", "description": "是否弹出分支弹窗" },
+          "branch_options": {
+            "type": "array",
+            "description": "分支选项",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "description": "选项标识 A/B/C" },
+                "text": { "type": "string", "description": "选项文字" },
+                "consequence": { "type": "string", "description": "后果简述" }
+              }
+            }
+          },
+          "ai_prompt": { "type": "string", "description": "AI 续写提示词" }
+        }
+      },
+      "HighlightListResponse": {
+        "type": "object",
+        "properties": {
+          "episode_no": { "type": "integer" },
+          "title": { "type": "string" },
+          "theme": { "type": "string" },
+          "total_duration": { "type": "integer" },
+          "highlight_count": { "type": "integer" },
+          "highlights": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Highlight" }
+          }
+        }
+      },
+      "BranchRequest": {
+        "type": "object",
+        "required": ["highlight_id", "branch_id"],
+        "properties": {
+          "episode_no": {
+            "type": "integer",
+            "default": 67,
+            "description": "剧集编号"
+          },
+          "highlight_id": {
+            "type": "integer",
+            "description": "高光点 ID（⚠️ 第67集范围 51~75，不是 1~25）"
+          },
+          "branch_id": {
+            "type": "string",
+            "description": "分支选项：A / B / C"
+          },
+          "branch_text": {
+            "type": "string",
+            "default": "",
+            "description": "用户选择的分支文字，如：探查前方暗道"
+          },
+          "context": {
+            "type": "string",
+            "default": "",
+            "description": "前端传的场景描述（兼容旧调用）"
+          }
+        }
+      },
+      "BranchTextResponse": {
+        "type": "object",
+        "properties": {
+          "branch_id": { "type": "string", "description": "分支选项 A/B/C" },
+          "text": { "type": "string", "description": "AI 续写正文" },
+          "cached": { "type": "boolean", "description": "是否来自缓存" },
+          "token_usage": { "type": "integer", "description": "消耗 token 数" }
+        }
+      },
+      "BranchImageResponse": {
+        "type": "object",
+        "properties": {
+          "branch_id": { "type": "string" },
+          "text": { "type": "string", "description": "AI 续写正文" },
+          "image_url": { "type": "string", "description": "生成的图片 URL（空串表示失败）" },
+          "result_type": { "type": "string", "example": "image" },
+          "cached": { "type": "boolean" },
+          "token_usage": { "type": "integer" }
+        }
+      },
+      "BranchVideoResponse": {
+        "type": "object",
+        "properties": {
+          "branch_id": { "type": "string" },
+          "result_type": { "type": "string", "enum": ["video", "image", "text"] },
+          "text": { "type": "string", "description": "分支描述文字" },
+          "media_url": { "type": "string", "description": "视频文件路径" },
+          "cached": { "type": "boolean" },
+          "token_usage": { "type": "integer" }
+        }
+      },
+      "AnalyzeRequest": {
+        "type": "object",
+        "required": ["episode_no", "title", "video_path"],
+        "properties": {
+          "episode_no": {
+            "type": "integer",
+            "description": "剧集编号"
+          },
+          "title": {
+            "type": "string",
+            "description": "剧集标题"
+          },
+          "theme": {
+            "type": "string",
+            "default": "古墓探险",
+            "description": "主题标签"
+          },
+          "video_path": {
+            "type": "string",
+            "description": "视频文件本地路径"
+          },
+          "episode_info": {
+            "type": "string",
+            "default": "",
+            "description": "给 AI 的剧集背景信息"
+          }
+        }
+      },
+      "AnalyzeResponse": {
+        "type": "object",
+        "properties": {
+          "episode_id": { "type": "integer" },
+          "episode_no": { "type": "integer" },
+          "frame_count": { "type": "integer", "description": "截帧数量" },
+          "highlight_count": { "type": "integer", "description": "识别的高光点数量" },
+          "status": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
