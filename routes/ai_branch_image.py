@@ -31,6 +31,8 @@ router = APIRouter(prefix="/ai", tags=["ai-image"])
 STABLE_DIFFUSION_API_KEY = getattr(__import__("config", fromlist=["STABLE_DIFFUSION_API_KEY"]), "STABLE_DIFFUSION_API_KEY", "")
 DOUBAO_IMAGE_API_KEY   = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_API_KEY"]),   "DOUBAO_IMAGE_API_KEY",   "")
 DOUBAO_IMAGE_BASE_URL  = getattr(__import__("config", fromlist=["DOUBAO_IMAGE_BASE_URL"]),  "DOUBAO_IMAGE_BASE_URL",  "https://ark.cn-beijing.volces.com/api/v3")
+# 服务器基地址：用于拼接完整图片URL返回给前端
+SERVER_BASE_URL        = getattr(__import__("config", fromlist=["SERVER_BASE_URL"]),        "SERVER_BASE_URL",        "").rstrip("/")
 
 # 生成的图片保存目录：backend/multimodal_assets/
 # os.path.dirname(__file__) 是 routes/ 目录，需要上一级才是 backend/
@@ -221,10 +223,13 @@ def generate_story_branch_with_image(req: BranchImageRequest):
     )
     cached = cur.fetchone()
     if cached:
+        # 拼接完整URL返回给前端
+        _raw = cached["media_path"] or ""
+        image_url = f"{SERVER_BASE_URL}{_raw}" if (SERVER_BASE_URL and _raw) else _raw
         return {
             "branch_id":   req.branch_id,
             "text":         cached["ai_response"],
-            "image_url":    cached["media_path"] or "",
+            "image_url":    image_url,
             "result_type":  "image",
             "cached":       True,
             "token_usage":  cached["token_usage"],
@@ -273,8 +278,11 @@ def generate_story_branch_with_image(req: BranchImageRequest):
 
     media_path = ""
     if img_ok and os.path.exists(img_path):
-        # 存前端可访问的 URL 路径（/assets/ep67/文件名）
+        # 存数据库用相对路径（/assets/ep67/文件名）
         media_path = f"{MEDIA_URL_PREFIX}/ep{req.episode_no}/{img_filename}"
+
+    # 返回给前端时拼接完整URL
+    image_url = f"{SERVER_BASE_URL}{media_path}" if (SERVER_BASE_URL and media_path) else (media_path or "")
 
     # 5. 存入缓存（result_type='image'）
     cur.execute(
@@ -300,7 +308,7 @@ def generate_story_branch_with_image(req: BranchImageRequest):
     return {
         "branch_id":   req.branch_id,
         "text":         ai_text,
-        "image_url":    media_path,
+        "image_url":    image_url,
         "result_type":  "image",
         "cached":       False,
         "token_usage":  ai_result["token_usage"],
