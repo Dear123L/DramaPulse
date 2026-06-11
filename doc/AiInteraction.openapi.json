@@ -1,0 +1,342 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "AI互动类型分析接口",
+    "description": "DramaPulse 新增接口 —— 用豆包AI分析高光点的互动类型（1=手电/2=心跳/3=AI弹幕），生成弹幕并写库；已有接口 /episodes/{no}/highlights 和 /episodes/{no}/highlights/{id} 返回值同步新增 interaction_type 和 ai_danmaku 两个字段。",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "本地开发服务器" }
+  ],
+  "tags": [
+    {
+      "name": "ai-interaction",
+      "description": "AI互动类型分析（新增接口）"
+    },
+    {
+      "name": "episodes",
+      "description": "已有接口 —— 高光点查询（返回值新增字段说明）"
+    }
+  ],
+  "paths": {
+    "/ai/analyze-interaction/{highlight_id}": {
+      "post": {
+        "tags": ["ai-interaction"],
+        "summary": "AI分析单个高光点互动类型",
+        "description": "对指定高光点调用豆包AI，根据场景描述、情绪、强度判断最合适的互动类型（1/2/3）。若类型为3（弹幕），同时生成5条弹幕写入数据库。已分析过的高光点默认走缓存，传 force=true 可强制重新分析。",
+        "operationId": "analyzeInteraction",
+        "parameters": [
+          {
+            "name": "highlight_id",
+            "in": "path",
+            "required": true,
+            "description": "高光点ID",
+            "schema": { "type": "integer", "example": 1 }
+          },
+          {
+            "name": "episode_no",
+            "in": "query",
+            "required": false,
+            "description": "剧集编号，默认67",
+            "schema": { "type": "integer", "default": 67, "example": 67 }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "description": "是否强制重新分析（true则忽略缓存）",
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "分析成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AnalyzeInteractionResponse" },
+                "examples": {
+                  "心跳类型": {
+                    "summary": "判断为心跳",
+                    "value": {
+                      "highlight_id": 1,
+                      "interaction_type": 2,
+                      "interaction_label": "心跳",
+                      "danmaku": [],
+                      "cached": false
+                    }
+                  },
+                  "AI弹幕类型": {
+                    "summary": "判断为AI弹幕并返回弹幕列表",
+                    "value": {
+                      "highlight_id": 5,
+                      "interaction_type": 3,
+                      "interaction_label": "AI弹幕",
+                      "danmaku": [
+                        "这转折我没想到！",
+                        "他终于说出来了",
+                        "泪目了真的",
+                        "剧情在这里炸了",
+                        "好家伙直接翻盘"
+                      ],
+                      "cached": false
+                    }
+                  },
+                  "走缓存": {
+                    "summary": "已分析过，直接返回缓存",
+                    "value": {
+                      "highlight_id": 1,
+                      "interaction_type": 1,
+                      "interaction_label": "手电",
+                      "danmaku": [],
+                      "cached": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集或高光点不存在",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/analyze-interaction/batch/{episode_no}": {
+      "post": {
+        "tags": ["ai-interaction"],
+        "summary": "批量分析一整集所有无分支高光点的互动类型",
+        "description": "对指定剧集所有 show_branch=0 的高光点批量执行AI互动类型分析。默认跳过已分析过的，传 force=true 可强制全部重新分析。调用间隔0.5秒防止API限流。",
+        "operationId": "batchAnalyzeInteraction",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号",
+            "schema": { "type": "integer", "example": 67 }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "description": "是否强制重新分析全部（true则忽略已有结果）",
+            "schema": { "type": "boolean", "default": false }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "批量分析完成",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BatchAnalyzeResponse" },
+                "example": {
+                  "total": 13,
+                  "results": [
+                    {
+                      "highlight_id": 1,
+                      "timestamp": 15000,
+                      "interaction_type": 2,
+                      "interaction_label": "心跳",
+                      "danmaku_count": 0
+                    },
+                    {
+                      "highlight_id": 2,
+                      "timestamp": 42000,
+                      "interaction_type": 3,
+                      "interaction_label": "AI弹幕",
+                      "danmaku_count": 5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "剧集不存在",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/episodes/{episode_no}/highlights": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取某集所有高光点（已有接口，新增字段说明）",
+        "description": "返回某集所有高光点。已有接口，本次在每条高光点数据中新增 interaction_type 和 ai_danmaku 两个字段。",
+        "operationId": "getHighlights",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号",
+            "schema": { "type": "integer", "example": 67 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "高光点列表",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HighlightsListResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/episodes/{episode_no}/highlights/{highlight_id}": {
+      "get": {
+        "tags": ["episodes"],
+        "summary": "获取单个高光点详情（已有接口，新增字段说明）",
+        "description": "返回单个高光点完整信息。已有接口，本次在返回值中新增 interaction_type 和 ai_danmaku 两个字段。",
+        "operationId": "getHighlight",
+        "parameters": [
+          {
+            "name": "episode_no",
+            "in": "path",
+            "required": true,
+            "description": "剧集编号",
+            "schema": { "type": "integer", "example": 67 }
+          },
+          {
+            "name": "highlight_id",
+            "in": "path",
+            "required": true,
+            "description": "高光点ID",
+            "schema": { "type": "integer", "example": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "高光点详情",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HighlightDetail" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "InteractionType": {
+        "type": "integer",
+        "nullable": true,
+        "enum": [null, 1, 2, 3],
+        "description": "互动类型枚举：null=未分析 | 1=手电（画面变暗，用户摇手机照明）| 2=心跳（屏幕/震动随剧情节奏心跳）| 3=AI弹幕（根据场景生成弹幕调动情绪）"
+      },
+      "AnalyzeInteractionResponse": {
+        "type": "object",
+        "properties": {
+          "highlight_id": {
+            "type": "integer",
+            "description": "高光点ID"
+          },
+          "interaction_type": {
+            "$ref": "#/components/schemas/InteractionType"
+          },
+          "interaction_label": {
+            "type": "string",
+            "description": "互动类型中文标签",
+            "enum": ["手电", "心跳", "AI弹幕"]
+          },
+          "danmaku": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "AI生成的弹幕列表（interaction_type=3时最多5条，其余为空数组）"
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "true=本次返回来自缓存，false=本次重新AI分析"
+          },
+          "ai_error": {
+            "type": "string",
+            "description": "AI调用失败时的错误信息（仅降级时出现，此时 interaction_type 为默认值2）",
+            "nullable": true
+          }
+        },
+        "required": ["highlight_id", "interaction_type", "interaction_label", "danmaku", "cached"]
+      },
+      "BatchAnalyzeItem": {
+        "type": "object",
+        "properties": {
+          "highlight_id": { "type": "integer" },
+          "timestamp": { "type": "integer", "description": "高光点时间戳（毫秒）" },
+          "interaction_type": { "$ref": "#/components/schemas/InteractionType" },
+          "interaction_label": { "type": "string" },
+          "danmaku_count": { "type": "integer", "description": "生成的弹幕条数" }
+        }
+      },
+      "BatchAnalyzeResponse": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "description": "本次处理的高光点总数" },
+          "results": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BatchAnalyzeItem" }
+          }
+        }
+      },
+      "HighlightDetail": {
+        "type": "object",
+        "description": "高光点详情（已有字段省略，仅说明新增字段）",
+        "properties": {
+          "id": { "type": "integer" },
+          "timestamp": { "type": "integer" },
+          "type": { "type": "string" },
+          "intensity": { "type": "integer" },
+          "emotion": { "type": "string" },
+          "scene_desc": { "type": "string" },
+          "action_desc": { "type": "string" },
+          "show_branch": { "type": "boolean" },
+          "branch_options": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "分支选项列表（show_branch=true时有值）"
+          },
+          "interaction_type": {
+            "$ref": "#/components/schemas/InteractionType",
+            "description": "【新增字段】互动类型，null表示未分析"
+          },
+          "ai_danmaku": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "【新增字段】AI生成弹幕列表，interaction_type=3时有值，其余为空数组"
+          }
+        }
+      },
+      "HighlightsListResponse": {
+        "type": "object",
+        "properties": {
+          "episode_no": { "type": "integer" },
+          "title": { "type": "string" },
+          "theme": { "type": "string" },
+          "total_duration": { "type": "integer" },
+          "highlight_count": { "type": "integer" },
+          "highlights": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/HighlightDetail" }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": { "type": "string", "description": "错误信息" }
+        }
+      }
+    }
+  }
+}

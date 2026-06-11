@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pathlib import Path
 
 from database import init_db
-from api import episodes, ai_branch, ai_branch_image, ai_branch_video_prepared, ai_branch_options
+from api import episodes, ai_branch, ai_branch_image, ai_branch_video_prepared, ai_branch_options, ai_interaction
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 VIDEO_DIR    = Path(__file__).resolve().parent
@@ -54,6 +54,7 @@ app.include_router(ai_branch.router)
 app.include_router(ai_branch_image.router)
 app.include_router(ai_branch_video_prepared.router)
 app.include_router(ai_branch_options.router)
+app.include_router(ai_interaction.router)         # AI互动类型分析
 
 
 @app.get("/", tags=["health"])

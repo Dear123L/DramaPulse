@@ -68,6 +68,21 @@ def episode_to_api(row: dict) -> dict:
     }
 
 
+def _parse_danmaku(val) -> list:
+    """解析 ai_danmaku 字段，始终返回列表"""
+    import json
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except Exception:
+            return []
+    return []
+
+
 def highlight_to_api(row: dict) -> dict:
     """把 DB 行转成 App 友好的高光点响应"""
     import json
@@ -102,4 +117,6 @@ def highlight_to_api(row: dict) -> dict:
         "show_branch": bool(row["show_branch"]),
         "branch_options": branch_options,
         "ai_prompt": row["ai_prompt"],
+        "interaction_type": row.get("interaction_type"),  # 1=手电 2=心跳 3=AI弹幕 None=未分析
+        "ai_danmaku": _parse_danmaku(row.get("ai_danmaku")),  # 弹幕列表，仅 interaction_type=3 时有值
     }

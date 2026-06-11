@@ -1,0 +1,240 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "AI分支选项生成接口",
+    "description": "DramaPulse 新增接口 —— 用豆包AI批量/单个生成高光点的3个分支选项（大胆/谨慎/意外），更新到 highlights 表",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "ai-options",
+      "description": "AI生成分支选项（后台管理接口）"
+    }
+  ],
+  "paths": {
+    "/ai/generate-branch-options": {
+      "post": {
+        "summary": "批量AI生成分支选项并更新数据库",
+        "deprecated": false,
+        "description": "批量为高光点AI生成3个分支选项（大胆/谨慎/意外），更新到 highlights 表的 branch_options 字段。\n\n默认只处理 branch_options 为空的高光点；overwrite=True 时覆盖所有已有选项。\n\n⚠️ 此接口为后台管理接口，调用时会逐个请求AI，批量时每个间隔1秒防限流。",
+        "operationId": "generate_branch_options",
+        "tags": [
+          "ai-options"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateOptionsRequest"
+              },
+              "example": {
+                "episode_no": 67,
+                "overwrite": true
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量生成结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateOptionsResponse"
+                },
+                "example": {
+                  "success": true,
+                  "message": "处理 12 个高光点，成功 12 个",
+                  "updated_count": 12,
+                  "results": [
+                    {
+                      "highlight_id": 2,
+                      "status": "success",
+                      "options": [
+                        {"id": "A", "text": "直接大步踏入未知区域", "consequence": "暗处传来异响"},
+                        {"id": "B", "text": "沿墙逐块敲击地砖排查", "consequence": "发现隐藏暗号"},
+                        {"id": "C", "text": "集体关掉所有强光手电", "consequence": "墙壁荧光浮现"}
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "剧集不存在",
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/ai/generate-branch-options/{highlight_id}": {
+      "post": {
+        "summary": "单个高光点AI生成分支选项",
+        "deprecated": false,
+        "description": "为指定高光点AI生成3个分支选项（大胆/谨慎/意外），覆盖更新到 highlights 表。适合对单个高光点选项不满意时重新生成。",
+        "operationId": "generate_single_branch_options",
+        "tags": [
+          "ai-options"
+        ],
+        "parameters": [
+          {
+            "name": "highlight_id",
+            "in": "path",
+            "description": "高光点 ID（第67集范围 51~75）",
+            "required": true,
+            "example": 17,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "单个高光点生成结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleOptionGenerateResponse"
+                },
+                "example": {
+                  "success": true,
+                  "highlight_id": 17,
+                  "options": [
+                    {"id": "A", "text": "直接上前徒手搬开陶瓮石块", "consequence": "瓮底暗格弹出"},
+                    {"id": "B", "text": "取出磷粉沿周边石砖撒满", "consequence": "暗纹拼出地图"},
+                    {"id": "C", "text": "完全不触碰古陶瓮", "consequence": "瓮自行转动"}
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "高光点不存在",
+            "headers": {}
+          },
+          "500": {
+            "description": "AI生成失败，请重试",
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GenerateOptionsRequest": {
+        "type": "object",
+        "properties": {
+          "episode_no": {
+            "type": "integer",
+            "default": 67,
+            "description": "剧集编号"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否覆盖已有选项。false=只处理无选项的高光点，true=覆盖所有"
+          }
+        }
+      },
+      "GenerateOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "是否全部成功"
+          },
+          "message": {
+            "type": "string",
+            "description": "处理结果摘要，如：处理 12 个高光点，成功 12 个"
+          },
+          "updated_count": {
+            "type": "integer",
+            "description": "成功更新的数量"
+          },
+          "results": {
+            "type": "array",
+            "description": "每个高光点的生成结果",
+            "items": {
+              "$ref": "#/components/schemas/OptionGenerateResult"
+            }
+          }
+        }
+      },
+      "OptionGenerateResult": {
+        "type": "object",
+        "properties": {
+          "highlight_id": {
+            "type": "integer",
+            "description": "高光点 ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "failed"],
+            "description": "生成状态"
+          },
+          "options": {
+            "type": "array",
+            "description": "生成的3个分支选项（失败时为空数组）",
+            "items": {
+              "$ref": "#/components/schemas/BranchOption"
+            }
+          },
+          "error": {
+            "type": "string",
+            "description": "失败原因（仅 status=failed 时存在）"
+          }
+        }
+      },
+      "BranchOption": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["A", "B", "C"],
+            "description": "选项标识：A=大胆/冒险，B=谨慎/智慧，C=出人意料"
+          },
+          "text": {
+            "type": "string",
+            "description": "选项文字（与当前场景紧密相关）"
+          },
+          "consequence": {
+            "type": "string",
+            "description": "后果预告（10字以内，制造悬念）"
+          }
+        }
+      },
+      "SingleOptionGenerateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "是否生成成功"
+          },
+          "highlight_id": {
+            "type": "integer",
+            "description": "高光点 ID"
+          },
+          "options": {
+            "type": "array",
+            "description": "生成的3个分支选项",
+            "items": {
+              "$ref": "#/components/schemas/BranchOption"
+            }
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}
