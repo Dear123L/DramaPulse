@@ -99,9 +99,12 @@ def api_summary():
             {"method": "GET", "path": "/episodes/{episode_no}", "desc": "获取单集信息"},
             {"method": "GET", "path": "/episodes/{episode_no}/highlights", "desc": "获取某集高光点配置（App核心接口）"},
             {"method": "GET", "path": "/episodes/{episode_no}/highlights/{id}", "desc": "获取单个高光点"},
-            {"method": "POST", "path": "/analyze", "desc": "触发视频分析（同步）"},
-            {"method": "POST", "path": "/analyze/async", "desc": "触发视频分析（异步）"},
-            {"method": "POST", "path": "/ai/branch", "desc": "AI生成剧情分支续写"},
+            {"method": "POST", "path": "/ai/branch", "desc": "AI生成剧情分支续写（方案A）"},
+            {"method": "POST", "path": "/ai/branch-with-image", "desc": "AI分支续写+配图（方案B）"},
+            {"method": "POST", "path": "/ai/branch-video", "desc": "预渲染视频分支（方案C）"},
+            {"method": "POST", "path": "/ai/branch-options/{highlight_id}", "desc": "AI生成分支选项"},
+            {"method": "POST", "path": "/ai/analyze-interaction/{highlight_id}", "desc": "AI分析单个高光点互动类型"},
+            {"method": "POST", "path": "/ai/analyze-interaction/batch/{episode_no}", "desc": "批量分析互动类型"},
         ]
     }
 

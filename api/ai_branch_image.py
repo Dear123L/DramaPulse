@@ -231,6 +231,7 @@ def generate_story_branch_with_image(req: BranchImageRequest):
             "text":         cached["ai_response"],
             "image_url":    image_url,
             "result_type":  "image",
+            "ending_type":  cached.get("ending_type", "survive"),
             "cached":       True,
             "token_usage":  cached["token_usage"],
         }
@@ -260,7 +261,7 @@ def generate_story_branch_with_image(req: BranchImageRequest):
     )
     ai_text = ai_result["text"]
 
-    # 4. 随机从预设图片池选一张（不生成黑底白字占位图）
+    # 4. AI 生成场景配图（调用豆包文生图 API，失败则从预设图池随机分配）
     import random
     PRESET_POOL = [
         "/assets/ep67/hl5_branchA_1781094085.png",
@@ -274,19 +275,54 @@ def generate_story_branch_with_image(req: BranchImageRequest):
         "/assets/ep67/hl23_branchB.png",
         "/assets/ep67/hl23_branchC.png",
     ]
-    media_path = random.choice(PRESET_POOL)
-    print(f"[ImageGen] 无缓存，随机分配预设图：{media_path}")
+
+    # 构建文生图 prompt
+    image_prompt = build_image_prompt(
+        scene_desc or highlight.get("scene_desc", ""),
+        branch_text,
+        highlight.get("action_desc", ""),
+    )
+
+    # 优先尝试 AI 生图，失败则降级到预设图池
+    media_path = ""
+    image_generated = False
+
+    # 尝试豆包文生图
+    if DOUBAO_IMAGE_API_KEY:
+        img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
+        img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
+        os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
+        if generate_image_doubao(image_prompt, img_output_path):
+            media_path = f"/assets/ep67/{img_filename}"
+            image_generated = True
+            print(f"[ImageGen] 豆包AI生图成功：{media_path}")
+
+    # 尝试 Stable Diffusion
+    if not image_generated and STABLE_DIFFUSION_API_KEY:
+        img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
+        img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
+        os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
+        if generate_image_stable_diffusion(image_prompt, img_output_path):
+            media_path = f"/assets/ep67/{img_filename}"
+            image_generated = True
+            print(f"[ImageGen] Stable Diffusion生图成功：{media_path}")
+
+    # AI 生图均失败，从预设图池随机分配
+    if not image_generated:
+        media_path = random.choice(PRESET_POOL)
+        print(f"[ImageGen] AI生图不可用，从预设图池随机分配：{media_path}")
 
     # 返回给前端时拼接完整URL
     image_url = f"{SERVER_BASE_URL}{media_path}" if SERVER_BASE_URL else media_path
 
-    # 5. 存入缓存（result_type='image'）
+    # 5. 存入缓存（result_type='image'，含 ending_type）
     cur.execute(
         """INSERT INTO branch_results
-           (highlight_id, episode_id, branch_id, branch_text, ai_response, media_path, result_type, prompt_sent, token_usage)
-           VALUES (%s, %s, %s, %s, %s, %s, 'image', %s, %s)
+           (highlight_id, episode_id, branch_id, branch_text, ai_response, media_path, result_type, ending_type, prompt_sent, token_usage)
+           VALUES (%s, %s, %s, %s, %s, %s, 'image', %s, %s, %s)
            ON DUPLICATE KEY UPDATE
              ai_response=VALUES(ai_response), media_path=VALUES(media_path),
+             ending_type=VALUES(ending_type),
              prompt_sent=VALUES(prompt_sent), token_usage=VALUES(token_usage),
              result_type='image'""",
         (
@@ -296,7 +332,8 @@ def generate_story_branch_with_image(req: BranchImageRequest):
             branch_text,
             ai_text,
             media_path,
-            "",          # prompt_sent 不再生成图片，留空
+            ai_result["ending_type"],
+            image_prompt,
             ai_result["token_usage"],
         ),
     )
@@ -306,6 +343,7 @@ def generate_story_branch_with_image(req: BranchImageRequest):
         "text":         ai_text,
         "image_url":    image_url,
         "result_type":  "image",
+        "ending_type":  ai_result["ending_type"],
         "cached":       False,
         "token_usage":  ai_result["token_usage"],
     }

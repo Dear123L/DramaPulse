@@ -51,6 +51,7 @@ def generate_story_branch(req: BranchRequest):
         return {
             "branch_id": req.branch_id,
             "text": cached["ai_response"],
+            "ending_type": cached.get("ending_type", "survive"),
             "cached": True,
             "token_usage": cached["token_usage"],
         }
@@ -83,16 +84,17 @@ def generate_story_branch(req: BranchRequest):
         branch_id=req.branch_id,
     )
 
-    # 4. 存入缓存
+    # 4. 存入缓存（含 ending_type）
     cur.execute(
-        """INSERT INTO branch_results (highlight_id, episode_id, branch_id, branch_text, ai_response, prompt_sent, token_usage)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+        """INSERT INTO branch_results (highlight_id, episode_id, branch_id, branch_text, ai_response, ending_type, prompt_sent, token_usage)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
         (
             req.highlight_id,
             episode["id"],
             req.branch_id,
             branch_text,
             result["text"],
+            result["ending_type"],
             prompt,
             result["token_usage"],
         ),
@@ -101,6 +103,7 @@ def generate_story_branch(req: BranchRequest):
     return {
         "branch_id": req.branch_id,
         "text": result["text"],
+        "ending_type": result["ending_type"],
         "cached": False,
         "token_usage": result["token_usage"],
     }

@@ -49,6 +49,9 @@ BranchResultRow = {
     "branch_id": str,  # A / B / C
     "branch_text": str,
     "ai_response": str,
+    "result_type": str,  # text / image / video
+    "ending_type": str,  # survive / death
+    "media_path": str,
     "prompt_sent": str,
     "token_usage": int,
     "created_at": str,

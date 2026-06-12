@@ -37,11 +37,13 @@ def _generate_options_with_ai(scene_desc: str, action_desc: str, emotion: str) -
         f"2. 选项B：谨慎/智慧的策略\n"
         f"3. 选项C：出人意料的第三条路\n"
         f"4. 每个选项必须与当前场景紧密相关，不能泛泛而谈\n"
-        f"5. consequence 是选择后可能发生的后果预告（10字以内，制造悬念）\n\n"
+        f"5. consequence 是选择后可能发生的后果预告（10字以内，制造悬念）\n"
+        f"6. 三个选项中只有一个是生路(survive)，其余为死路(death)，标注在ending_type字段\n"
+        f"7. 生路选项的consequence暗示转机，死路选项的consequence暗示危险\n\n"
         f"严格按以下JSON格式返回（只返回JSON数组，不要其他文字）：\n"
-        f'[{{"id": "A", "text": "选项文字", "consequence": "后果预告"}}, '
-        f'{{"id": "B", "text": "选项文字", "consequence": "后果预告"}}, '
-        f'{{"id": "C", "text": "选项文字", "consequence": "后果预告"}}]'
+        f'[{{"id": "A", "text": "选项文字", "consequence": "后果预告", "ending_type": "survive"}}, '
+        f'{{"id": "B", "text": "选项文字", "consequence": "后果预告", "ending_type": "death"}}, '
+        f'{{"id": "C", "text": "选项文字", "consequence": "后果预告", "ending_type": "death"}}]'
     )
 
     try:
@@ -68,6 +70,10 @@ def _generate_options_with_ai(scene_desc: str, action_desc: str, emotion: str) -
                 opt["text"] = f"选项{chr(65+i)}"
             if "consequence" not in opt:
                 opt["consequence"] = ""
+            if "ending_type" not in opt:
+                opt["ending_type"] = "death" if i > 0 else "survive"  # 默认A=生路
+            if opt["ending_type"] not in ("survive", "death"):
+                opt["ending_type"] = "death"
 
         return options
     except json.JSONDecodeError as e:

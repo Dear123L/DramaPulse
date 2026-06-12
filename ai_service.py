@@ -31,7 +31,7 @@ def generate_branch(scene_desc: str, characters: str, emotion: str,
         branch_id: 选项 ID（A/B/C）
 
     Returns:
-        dict: {"text": "续写内容", "token_usage": int}
+        dict: {"text": "续写内容", "ending_type": "survive"/"death", "token_usage": int}
     """
     client = _get_client()
     prompt = (
@@ -39,25 +39,42 @@ def generate_branch(scene_desc: str, characters: str, emotion: str,
         f"当前场景：{scene_desc}\n"
         f"角色状态：{characters}\n"
         f"情绪氛围：{emotion}\n\n"
-        f"观众选择了「{branch_text}」，请根据这个选择生成一段100字以内的沉浸式剧情续写。\n"
+        f"观众选择了「{branch_text}」（选项{branch_id}），请根据这个选择生成剧情续写。\n"
         f"要求：\n"
         f"1. 保持与原剧一致的文风（悬疑紧张的古墓探险风格）\n"
         f"2. 紧接当前情节，不要重复已知信息\n"
-        f"3. 结尾留有悬念，引导观众继续看\n"
-        f"4. 直接输出续写内容，不要加前缀"
+        f"3. 结尾留有悬念\n"
+        f"4. 每个分支选项有不同的结局走向：其中只有一个选项是生路(survive)，其他都是死路(death)\n"
+        f"5. 死路结局要写出危险逼近或陷入绝境的紧迫感，生路结局要写出转机或逃出生天的希望\n\n"
+        f"严格按以下JSON格式返回（只返回JSON，不要其他文字）：\n"
+        f'{{"text": "100字以内的沉浸式续写", "ending_type": "survive"}}\n'
+        f'或\n'
+        f'{{"text": "100字以内的沉浸式续写", "ending_type": "death"}}'
     )
 
     try:
         response = client.chat.completions.create(
             model=config.AI_MODEL_ID,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
+            max_tokens=400,
         )
-        text = response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+        result = json.loads(raw)
+        text = result.get("text", "")
+        ending_type = result.get("ending_type", "survive")
+        if ending_type not in ("survive", "death"):
+            ending_type = "survive"
         tokens = response.usage.total_tokens if response.usage else 0
-        return {"text": text, "token_usage": tokens}
+        return {"text": text, "ending_type": ending_type, "token_usage": tokens}
+    except json.JSONDecodeError:
+        # JSON 解析失败，尝试从原始文本中提取
+        tokens = response.usage.total_tokens if response.usage else 0
+        return {"text": raw, "ending_type": "survive", "token_usage": tokens}
     except Exception as e:
-        return {"text": f"[AI生成失败: {str(e)}]", "token_usage": 0}
+        return {"text": f"[AI生成失败: {str(e)}]", "ending_type": "survive", "token_usage": 0}
 
 
 def analyze_frame(img_path: str, timestamp: int, episode_info: str = "") -> dict:
