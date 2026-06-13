@@ -99,77 +99,77 @@ def generate_branch_options(req: GenerateOptionsRequest):
     - overwrite=True 时覆盖已有选项
     """
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 查找剧集
-    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
-    episode = cur.fetchone()
-    if not episode:
-        raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
-    episode_id = episode["id"]
+        # 查找剧集
+        cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
+        episode = cur.fetchone()
+        if not episode:
+            raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
+        episode_id = episode["id"]
 
-    # 查找高光点
-    if req.overwrite:
-        cur.execute(
-            "SELECT id, scene_desc, action_desc, emotion, branch_options FROM highlights WHERE episode_id=%s AND show_branch=1",
-            (episode_id,),
-        )
-    else:
-        cur.execute(
-            "SELECT id, scene_desc, action_desc, emotion, branch_options FROM highlights WHERE episode_id=%s AND show_branch=1 AND (branch_options IS NULL OR branch_options='[]' OR branch_options='')",
-            (episode_id,),
-        )
+        # 查找高光点
+        if req.overwrite:
+            cur.execute(
+                "SELECT id, scene_desc, action_desc, emotion, branch_options FROM highlights WHERE episode_id=%s AND show_branch=1",
+                (episode_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT id, scene_desc, action_desc, emotion, branch_options FROM highlights WHERE episode_id=%s AND show_branch=1 AND (branch_options IS NULL OR branch_options='[]' OR branch_options='')",
+                (episode_id,),
+            )
 
-    highlights = cur.fetchall()
-    if not highlights:
+        highlights = cur.fetchall()
+        if not highlights:
+            return {
+                "success": True,
+                "message": "没有需要生成选项的高光点" + ("（所有高光点已有选项，可用 overwrite=True 覆盖）" if not req.overwrite else ""),
+                "updated_count": 0,
+                "results": [],
+            }
+
+        results = []
+        for hl in highlights:
+            hl_id = hl["id"]
+            scene_desc = hl.get("scene_desc", "")
+            action_desc = hl.get("action_desc", "")
+            emotion = hl.get("emotion", "")
+
+            options = _generate_options_with_ai(scene_desc, action_desc, emotion)
+
+            if options:
+                options_json = json.dumps(options, ensure_ascii=False)
+                cur.execute(
+                    "UPDATE highlights SET branch_options=%s WHERE id=%s",
+                    (options_json, hl_id),
+                )
+                results.append({
+                    "highlight_id": hl_id,
+                    "status": "success",
+                    "options": options,
+                })
+            else:
+                results.append({
+                    "highlight_id": hl_id,
+                    "status": "failed",
+                    "options": [],
+                    "error": "AI生成失败",
+                })
+
+            if len(highlights) > 1:
+                time.sleep(1)
+
+        success_count = sum(1 for r in results if r["status"] == "success")
         return {
             "success": True,
-            "message": "没有需要生成选项的高光点" + ("（所有高光点已有选项，可用 overwrite=True 覆盖）" if not req.overwrite else ""),
-            "updated_count": 0,
-            "results": [],
+            "message": f"处理 {len(results)} 个高光点，成功 {success_count} 个",
+            "updated_count": success_count,
+            "results": results,
         }
-
-    results = []
-    for hl in highlights:
-        hl_id = hl["id"]
-        scene_desc = hl.get("scene_desc", "")
-        action_desc = hl.get("action_desc", "")
-        emotion = hl.get("emotion", "")
-
-        # 调用AI生成选项
-        options = _generate_options_with_ai(scene_desc, action_desc, emotion)
-
-        if options:
-            # 更新数据库
-            options_json = json.dumps(options, ensure_ascii=False)
-            cur.execute(
-                "UPDATE highlights SET branch_options=%s WHERE id=%s",
-                (options_json, hl_id),
-            )
-            results.append({
-                "highlight_id": hl_id,
-                "status": "success",
-                "options": options,
-            })
-        else:
-            results.append({
-                "highlight_id": hl_id,
-                "status": "failed",
-                "options": [],
-                "error": "AI生成失败",
-            })
-
-        # 批量调用间隔1秒，避免API限流
-        if len(highlights) > 1:
-            time.sleep(1)
-
-    success_count = sum(1 for r in results if r["status"] == "success")
-    return {
-        "success": True,
-        "message": f"处理 {len(results)} 个高光点，成功 {success_count} 个",
-        "updated_count": success_count,
-        "results": results,
-    }
+    finally:
+        conn.close()
 
 
 @router.post("/generate-branch-options/{highlight_id}", summary="单个高光点AI生成分支选项")
@@ -179,36 +179,39 @@ def generate_single_branch_options(highlight_id: int):
     无论如何都会覆盖该高光点的 branch_options。
     """
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 查找高光点
-    cur.execute(
-        "SELECT id, scene_desc, action_desc, emotion FROM highlights WHERE id=%s",
-        (highlight_id,),
-    )
-    hl = cur.fetchone()
-    if not hl:
-        raise HTTPException(status_code=404, detail=f"高光点 {highlight_id} 不存在")
+        # 查找高光点
+        cur.execute(
+            "SELECT id, scene_desc, action_desc, emotion FROM highlights WHERE id=%s",
+            (highlight_id,),
+        )
+        hl = cur.fetchone()
+        if not hl:
+            raise HTTPException(status_code=404, detail=f"高光点 {highlight_id} 不存在")
 
-    # 调用AI生成选项
-    options = _generate_options_with_ai(
-        hl.get("scene_desc", ""),
-        hl.get("action_desc", ""),
-        hl.get("emotion", ""),
-    )
+        # 调用AI生成选项
+        options = _generate_options_with_ai(
+            hl.get("scene_desc", ""),
+            hl.get("action_desc", ""),
+            hl.get("emotion", ""),
+        )
 
-    if not options:
-        raise HTTPException(status_code=500, detail="AI选项生成失败，请重试")
+        if not options:
+            raise HTTPException(status_code=500, detail="AI选项生成失败，请重试")
 
-    # 更新数据库
-    options_json = json.dumps(options, ensure_ascii=False)
-    cur.execute(
-        "UPDATE highlights SET branch_options=%s WHERE id=%s",
-        (options_json, highlight_id),
-    )
+        # 更新数据库
+        options_json = json.dumps(options, ensure_ascii=False)
+        cur.execute(
+            "UPDATE highlights SET branch_options=%s WHERE id=%s",
+            (options_json, highlight_id),
+        )
 
-    return {
-        "success": True,
-        "highlight_id": highlight_id,
-        "options": options,
-    }
+        return {
+            "success": True,
+            "highlight_id": highlight_id,
+            "options": options,
+        }
+    finally:
+        conn.close()

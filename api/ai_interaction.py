@@ -106,59 +106,62 @@ def analyze_interaction(highlight_id: int, episode_no: int = 67, force: bool = F
     - 3 = AI弹幕（关键场景→弹幕刷屏）
     """
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 查集
-    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (episode_no,))
-    episode = cur.fetchone()
-    if not episode:
-        raise HTTPException(status_code=404, detail=f"剧集 {episode_no} 不存在")
+        # 查集
+        cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (episode_no,))
+        episode = cur.fetchone()
+        if not episode:
+            raise HTTPException(status_code=404, detail=f"剧集 {episode_no} 不存在")
 
-    # 查高光点
-    cur.execute(
-        "SELECT * FROM highlights WHERE id=%s AND episode_id=%s",
-        (highlight_id, episode["id"]),
-    )
-    highlight = cur.fetchone()
-    if not highlight:
-        raise HTTPException(status_code=404, detail=f"高光点 {highlight_id} 不存在")
+        # 查高光点
+        cur.execute(
+            "SELECT * FROM highlights WHERE id=%s AND episode_id=%s",
+            (highlight_id, episode["id"]),
+        )
+        highlight = cur.fetchone()
+        if not highlight:
+            raise HTTPException(status_code=404, detail=f"高光点 {highlight_id} 不存在")
 
-    # 已分析过且不强制重跑则直接返回缓存
-    if highlight.get("interaction_type") is not None and not force:
-        danmaku = highlight.get("ai_danmaku") or []
-        if isinstance(danmaku, str):
-            try:
-                danmaku = json.loads(danmaku)
-            except Exception:
-                danmaku = []
+        # 已分析过且不强制重跑则直接返回缓存
+        if highlight.get("interaction_type") is not None and not force:
+            danmaku = highlight.get("ai_danmaku") or []
+            if isinstance(danmaku, str):
+                try:
+                    danmaku = json.loads(danmaku)
+                except Exception:
+                    danmaku = []
+            return {
+                "highlight_id": highlight_id,
+                "interaction_type": highlight["interaction_type"],
+                "interaction_label": INTERACTION_LABELS.get(highlight["interaction_type"], "未知"),
+                "danmaku": danmaku,
+                "cached": True,
+            }
+
+        # 调用AI分析
+        result = _analyze_interaction_type(highlight)
+        interaction_type = result["interaction_type"]
+        danmaku = result["danmaku"]
+
+        # 写入数据库
+        cur.execute(
+            "UPDATE highlights SET interaction_type=%s, ai_danmaku=%s WHERE id=%s",
+            (interaction_type, json.dumps(danmaku, ensure_ascii=False), highlight_id),
+        )
+        conn.commit()
+
         return {
             "highlight_id": highlight_id,
-            "interaction_type": highlight["interaction_type"],
-            "interaction_label": INTERACTION_LABELS.get(highlight["interaction_type"], "未知"),
+            "interaction_type": interaction_type,
+            "interaction_label": INTERACTION_LABELS.get(interaction_type, "未知"),
             "danmaku": danmaku,
-            "cached": True,
+            "cached": False,
+            **({"ai_error": result["error"]} if "error" in result else {}),
         }
-
-    # 调用AI分析
-    result = _analyze_interaction_type(highlight)
-    interaction_type = result["interaction_type"]
-    danmaku = result["danmaku"]
-
-    # 写入数据库
-    cur.execute(
-        "UPDATE highlights SET interaction_type=%s, ai_danmaku=%s WHERE id=%s",
-        (interaction_type, json.dumps(danmaku, ensure_ascii=False), highlight_id),
-    )
-    conn.commit()
-
-    return {
-        "highlight_id": highlight_id,
-        "interaction_type": interaction_type,
-        "interaction_label": INTERACTION_LABELS.get(interaction_type, "未知"),
-        "danmaku": danmaku,
-        "cached": False,
-        **({"ai_error": result["error"]} if "error" in result else {}),
-    }
+    finally:
+        conn.close()
 
 
 @router.post(
@@ -174,45 +177,48 @@ def batch_analyze_interaction(episode_no: int, force: bool = False):
     import time as _time
 
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (episode_no,))
-    episode = cur.fetchone()
-    if not episode:
-        raise HTTPException(status_code=404, detail=f"剧集 {episode_no} 不存在")
+        cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (episode_no,))
+        episode = cur.fetchone()
+        if not episode:
+            raise HTTPException(status_code=404, detail=f"剧集 {episode_no} 不存在")
 
-    # 只处理无分支的高光点
-    condition = "episode_id=%s AND show_branch=0"
-    if not force:
-        condition += " AND interaction_type IS NULL"
-    cur.execute(f"SELECT * FROM highlights WHERE {condition} ORDER BY id", (episode["id"],))
-    highlights = cur.fetchall()
+        # 只处理无分支的高光点
+        condition = "episode_id=%s AND show_branch=0"
+        if not force:
+            condition += " AND interaction_type IS NULL"
+        cur.execute(f"SELECT * FROM highlights WHERE {condition} ORDER BY id", (episode["id"],))
+        highlights = cur.fetchall()
 
-    if not highlights:
-        return {"message": "没有需要分析的高光点", "total": 0, "results": []}
+        if not highlights:
+            return {"message": "没有需要分析的高光点", "total": 0, "results": []}
 
-    results = []
-    for hl in highlights:
-        result = _analyze_interaction_type(hl)
-        interaction_type = result["interaction_type"]
-        danmaku = result["danmaku"]
+        results = []
+        for hl in highlights:
+            result = _analyze_interaction_type(hl)
+            interaction_type = result["interaction_type"]
+            danmaku = result["danmaku"]
 
-        cur.execute(
-            "UPDATE highlights SET interaction_type=%s, ai_danmaku=%s WHERE id=%s",
-            (interaction_type, json.dumps(danmaku, ensure_ascii=False), hl["id"]),
-        )
-        conn.commit()
+            cur.execute(
+                "UPDATE highlights SET interaction_type=%s, ai_danmaku=%s WHERE id=%s",
+                (interaction_type, json.dumps(danmaku, ensure_ascii=False), hl["id"]),
+            )
+            conn.commit()
 
-        results.append({
-            "highlight_id": hl["id"],
-            "timestamp": hl["timestamp"],
-            "interaction_type": interaction_type,
-            "interaction_label": INTERACTION_LABELS.get(interaction_type, "未知"),
-            "danmaku_count": len(danmaku),
-        })
-        _time.sleep(0.5)  # 防限流
+            results.append({
+                "highlight_id": hl["id"],
+                "timestamp": hl["timestamp"],
+                "interaction_type": interaction_type,
+                "interaction_label": INTERACTION_LABELS.get(interaction_type, "未知"),
+                "danmaku_count": len(danmaku),
+            })
+            _time.sleep(0.5)  # 防限流
 
-    return {
-        "total": len(results),
-        "results": results,
-    }
+        return {
+            "total": len(results),
+            "results": results,
+        }
+    finally:
+        conn.close()

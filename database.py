@@ -1,42 +1,24 @@
 """
 database.py
-MySQL 连接池管理，通过 pymysql 实现
+MySQL 连接管理 — 每次请求新建独立连接，线程安全
 """
 import pymysql
 from pymysql.cursors import DictCursor
 import config
 
-_pool = None
 
 def get_connection() -> pymysql.Connection:
-    """获取一个数据库连接（从连接池或新建）"""
-    global _pool
-    if _pool is None:
-        _pool = pymysql.Connection(
-            host=config.MYSQL_HOST,
-            port=config.MYSQL_PORT,
-            user=config.MYSQL_USER,
-            password=config.MYSQL_PASSWORD,
-            database=config.MYSQL_DATABASE,
-            charset="utf8mb4",
-            cursorclass=DictCursor,
-            autocommit=True,
-        )
-    # 每次调用检查连接是否存活
-    try:
-        _pool.ping(reconnect=True)
-    except Exception:
-        _pool = pymysql.Connection(
-            host=config.MYSQL_HOST,
-            port=config.MYSQL_PORT,
-            user=config.MYSQL_USER,
-            password=config.MYSQL_PASSWORD,
-            database=config.MYSQL_DATABASE,
-            charset="utf8mb4",
-            cursorclass=DictCursor,
-            autocommit=True,
-        )
-    return _pool
+    """每次调用新建一个独立连接，调用方负责 close()"""
+    return pymysql.Connection(
+        host=config.MYSQL_HOST,
+        port=config.MYSQL_PORT,
+        user=config.MYSQL_USER,
+        password=config.MYSQL_PASSWORD,
+        database=config.MYSQL_DATABASE,
+        charset="utf8mb4",
+        cursorclass=DictCursor,
+        autocommit=True,
+    )
 
 
 def init_db():
@@ -54,5 +36,4 @@ def init_db():
         % config.MYSQL_DATABASE
     )
     conn.close()
-    # 建表由 run_create_tables.py 处理，这里不再重复
     print(f"[DB] 数据库 {config.MYSQL_DATABASE} 就绪")

@@ -66,52 +66,53 @@ def get_prepared_branch_video(req: BranchVideoRequest):
     如果没有缓存则 fallback 到文字续写（result_type='text'）。
     """
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 1. 查找高光点
-    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
-    episode = cur.fetchone()
-    if not episode:
-        raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
-    episode_id = episode["id"]
+        # 1. 查找高光点
+        cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
+        episode = cur.fetchone()
+        if not episode:
+            raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
+        episode_id = episode["id"]
 
-    # 2. 只查 video 类型的缓存；没有就 404，让前端降级
-    cur.execute(
-        "SELECT * FROM branch_results WHERE highlight_id=%s AND branch_id=%s AND result_type='video'",
-        (req.highlight_id, req.branch_id),
-    )
-    cached = cur.fetchone()
-    if cached:
-        # 验证视频文件真的存在
-        video_path = None
-        if cached.get("media_path"):
-            # media_path 可能是 /static/... 或相对路径
-            maybe = os.path.join(
-                os.path.dirname(__file__), "..", "frontend", "branch_media",
-                f"ep{req.episode_no}", f"hl{req.highlight_id}_branch{req.branch_id}.mp4"
-            )
-            maybe = os.path.normpath(maybe)
-            if os.path.isfile(maybe):
-                video_path = "/static/branch_media/" + f"ep{req.episode_no}/hl{req.highlight_id}_branch{req.branch_id}.mp4"
+        # 2. 只查 video 类型的缓存；没有就 404，让前端降级
+        cur.execute(
+            "SELECT * FROM branch_results WHERE highlight_id=%s AND branch_id=%s AND result_type='video'",
+            (req.highlight_id, req.branch_id),
+        )
+        cached = cur.fetchone()
+        if cached:
+            # 验证视频文件真的存在
+            video_path = None
+            if cached.get("media_path"):
+                maybe = os.path.join(
+                    os.path.dirname(__file__), "..", "frontend", "branch_media",
+                    f"ep{req.episode_no}", f"hl{req.highlight_id}_branch{req.branch_id}.mp4"
+                )
+                maybe = os.path.normpath(maybe)
+                if os.path.isfile(maybe):
+                    video_path = "/static/branch_media/" + f"ep{req.episode_no}/hl{req.highlight_id}_branch{req.branch_id}.mp4"
 
-        if video_path:
-            return {
-                "branch_id":   req.branch_id,
-                "result_type":  "video",
-                "text":        cached["ai_response"] or "",
-                "media_url":    video_path,
-                "cached":       True,
-                "token_usage":  cached["token_usage"],
-            }
-        else:
-            print(f"[branch-video] 缓存记录存在但视频文件不存在，返回404让前端降级")
+            if video_path:
+                return {
+                    "branch_id":   req.branch_id,
+                    "result_type":  "video",
+                    "text":        cached["ai_response"] or "",
+                    "media_url":    video_path,
+                    "cached":       True,
+                    "token_usage":  cached["token_usage"],
+                }
+            else:
+                print(f"[branch-video] 缓存记录存在但视频文件不存在，返回404让前端降级")
 
-
-    # 3. 无视频缓存或视频文件不存在 → 404，让前端降级到 /ai/branch-with-image
-    raise HTTPException(
-        status_code=404,
-        detail=f"高光点 {req.highlight_id} 分支 {req.branch_id} 尚无预渲染视频，请让前端降级"
-    )
+        # 3. 无视频缓存或视频文件不存在 → 404，让前端降级到 /ai/branch-with-image
+        raise HTTPException(
+            status_code=404,
+            detail=f"高光点 {req.highlight_id} 分支 {req.branch_id} 尚无预渲染视频，请让前端降级"
+        )
+    finally:
+        conn.close()
 
 
 @router.get("/branch-video/{episode_no}/{highlight_id}/{branch_id}", tags=["ai-video-prepared"])

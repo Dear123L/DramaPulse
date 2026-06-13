@@ -199,151 +199,147 @@ def generate_story_branch_with_image(req: BranchImageRequest):
     如果文生图失败，仍返回文字续写，media_path 为空。
     """
     conn = database.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    # 1. 查找高光点
-    cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
-    episode = cur.fetchone()
-    if not episode:
-        raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
-    episode_id = episode["id"]
+        # 1. 查找高光点
+        cur.execute("SELECT id FROM episodes WHERE episode_no=%s", (req.episode_no,))
+        episode = cur.fetchone()
+        if not episode:
+            raise HTTPException(status_code=404, detail=f"剧集 {req.episode_no} 不存在")
+        episode_id = episode["id"]
 
-    cur.execute(
-        "SELECT * FROM highlights WHERE id=%s AND episode_id=%s",
-        (req.highlight_id, episode_id),
-    )
-    highlight = cur.fetchone()
-    if not highlight:
-        raise HTTPException(status_code=404, detail=f"高光点 {req.highlight_id} 不存在")
+        cur.execute(
+            "SELECT * FROM highlights WHERE id=%s AND episode_id=%s",
+            (req.highlight_id, episode_id),
+        )
+        highlight = cur.fetchone()
+        if not highlight:
+            raise HTTPException(status_code=404, detail=f"高光点 {req.highlight_id} 不存在")
 
-    # 2. 检查缓存（result_type='image'）
-    cur.execute(
-        "SELECT * FROM branch_results WHERE highlight_id=%s AND branch_id=%s AND result_type='image'",
-        (req.highlight_id, req.branch_id),
-    )
-    cached = cur.fetchone()
-    if cached:
-        # 拼接完整URL返回给前端
-        _raw = cached["media_path"] or ""
-        image_url = f"{SERVER_BASE_URL}{_raw}" if (SERVER_BASE_URL and _raw) else _raw
+        # 2. 检查缓存（result_type='image'）
+        cur.execute(
+            "SELECT * FROM branch_results WHERE highlight_id=%s AND branch_id=%s AND result_type='image'",
+            (req.highlight_id, req.branch_id),
+        )
+        cached = cur.fetchone()
+        if cached:
+            _raw = cached["media_path"] or ""
+            image_url = f"{SERVER_BASE_URL}{_raw}" if (SERVER_BASE_URL and _raw) else _raw
+            return {
+                "branch_id":   req.branch_id,
+                "text":         cached["ai_response"],
+                "image_url":    image_url,
+                "result_type":  "image",
+                "ending_type":  cached.get("ending_type", "survive"),
+                "cached":       True,
+                "token_usage":  cached["token_usage"],
+            }
+
+        # 3. 调用 AI 文字续写
+        branch_text = req.branch_text
+        if not branch_text:
+            import json as _json
+            opts = highlight.get("branch_options") or "[]"
+            if isinstance(opts, str):
+                try:
+                    opts = _json.loads(opts)
+                except Exception:
+                    opts = []
+            for opt in opts:
+                if opt.get("id") == req.branch_id:
+                    branch_text = opt.get("text", "")
+                    break
+
+        scene_desc  = req.context or highlight.get("scene_desc", "")
+        ai_result   = generate_branch(
+            scene_desc=scene_desc,
+            characters=highlight.get("action_desc", ""),
+            emotion=highlight.get("emotion", ""),
+            branch_text=branch_text,
+            branch_id=req.branch_id,
+        )
+        ai_text = ai_result["text"]
+
+        # 4. AI 生成场景配图（调用豆包文生图 API，失败则从预设图池随机分配）
+        import random
+        PRESET_POOL = [
+            "/assets/ep67/hl5_branchA_1781094085.png",
+            "/assets/ep67/hl9_branchA.png",
+            "/assets/ep67/hl9_branchB.png",
+            "/assets/ep67/hl9_branchC.png",
+            "/assets/ep67/hl17_branchA.png",
+            "/assets/ep67/hl17_branchB.png",
+            "/assets/ep67/hl17_branchC.png",
+            "/assets/ep67/hl23_branchA.png",
+            "/assets/ep67/hl23_branchB.png",
+            "/assets/ep67/hl23_branchC.png",
+        ]
+
+        image_prompt = build_image_prompt(
+            scene_desc or highlight.get("scene_desc", ""),
+            branch_text,
+            highlight.get("action_desc", ""),
+        )
+
+        media_path = ""
+        image_generated = False
+
+        if DOUBAO_IMAGE_API_KEY:
+            img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
+            img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
+            os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
+            if generate_image_doubao(image_prompt, img_output_path):
+                media_path = f"/assets/ep67/{img_filename}"
+                image_generated = True
+                print(f"[ImageGen] 豆包AI生图成功：{media_path}")
+
+        if not image_generated and STABLE_DIFFUSION_API_KEY:
+            img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
+            img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
+            os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
+            if generate_image_stable_diffusion(image_prompt, img_output_path):
+                media_path = f"/assets/ep67/{img_filename}"
+                image_generated = True
+                print(f"[ImageGen] Stable Diffusion生图成功：{media_path}")
+
+        if not image_generated:
+            media_path = random.choice(PRESET_POOL)
+            print(f"[ImageGen] AI生图不可用，从预设图池随机分配：{media_path}")
+
+        image_url = f"{SERVER_BASE_URL}{media_path}" if SERVER_BASE_URL else media_path
+
+        # 5. 存入缓存（result_type='image'，含 ending_type）
+        cur.execute(
+            """INSERT INTO branch_results
+               (highlight_id, episode_id, branch_id, branch_text, ai_response, media_path, result_type, ending_type, prompt_sent, token_usage)
+               VALUES (%s, %s, %s, %s, %s, %s, 'image', %s, %s, %s)
+               ON DUPLICATE KEY UPDATE
+                 ai_response=VALUES(ai_response), media_path=VALUES(media_path),
+                 ending_type=VALUES(ending_type),
+                 prompt_sent=VALUES(prompt_sent), token_usage=VALUES(token_usage),
+                 result_type='image'""",
+            (
+                req.highlight_id,
+                episode_id,
+                req.branch_id,
+                branch_text,
+                ai_text,
+                media_path,
+                ai_result["ending_type"],
+                image_prompt,
+                ai_result["token_usage"],
+            ),
+        )
+
         return {
             "branch_id":   req.branch_id,
-            "text":         cached["ai_response"],
+            "text":         ai_text,
             "image_url":    image_url,
             "result_type":  "image",
-            "ending_type":  cached.get("ending_type", "survive"),
-            "cached":       True,
-            "token_usage":  cached["token_usage"],
+            "ending_type":  ai_result["ending_type"],
+            "cached":       False,
+            "token_usage":  ai_result["token_usage"],
         }
-
-    # 3. 调用 AI 文字续写
-    branch_text = req.branch_text
-    if not branch_text:
-        import json as _json
-        opts = highlight.get("branch_options") or "[]"
-        if isinstance(opts, str):
-            try:
-                opts = _json.loads(opts)
-            except Exception:
-                opts = []
-        for opt in opts:
-            if opt.get("id") == req.branch_id:
-                branch_text = opt.get("text", "")
-                break
-
-    scene_desc  = req.context or highlight.get("scene_desc", "")
-    ai_result   = generate_branch(
-        scene_desc=scene_desc,
-        characters=highlight.get("action_desc", ""),
-        emotion=highlight.get("emotion", ""),
-        branch_text=branch_text,
-        branch_id=req.branch_id,
-    )
-    ai_text = ai_result["text"]
-
-    # 4. AI 生成场景配图（调用豆包文生图 API，失败则从预设图池随机分配）
-    import random
-    PRESET_POOL = [
-        "/assets/ep67/hl5_branchA_1781094085.png",
-        "/assets/ep67/hl9_branchA.png",
-        "/assets/ep67/hl9_branchB.png",
-        "/assets/ep67/hl9_branchC.png",
-        "/assets/ep67/hl17_branchA.png",
-        "/assets/ep67/hl17_branchB.png",
-        "/assets/ep67/hl17_branchC.png",
-        "/assets/ep67/hl23_branchA.png",
-        "/assets/ep67/hl23_branchB.png",
-        "/assets/ep67/hl23_branchC.png",
-    ]
-
-    # 构建文生图 prompt
-    image_prompt = build_image_prompt(
-        scene_desc or highlight.get("scene_desc", ""),
-        branch_text,
-        highlight.get("action_desc", ""),
-    )
-
-    # 优先尝试 AI 生图，失败则降级到预设图池
-    media_path = ""
-    image_generated = False
-
-    # 尝试豆包文生图
-    if DOUBAO_IMAGE_API_KEY:
-        img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
-        img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
-        os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
-        if generate_image_doubao(image_prompt, img_output_path):
-            media_path = f"/assets/ep67/{img_filename}"
-            image_generated = True
-            print(f"[ImageGen] 豆包AI生图成功：{media_path}")
-
-    # 尝试 Stable Diffusion
-    if not image_generated and STABLE_DIFFUSION_API_KEY:
-        img_filename = f"hl{req.highlight_id}_branch{req.branch_id}_{int(time.time())}.png"
-        img_output_path = os.path.join(ASSETS_DIR, "ep67", img_filename)
-        os.makedirs(os.path.dirname(img_output_path), exist_ok=True)
-        if generate_image_stable_diffusion(image_prompt, img_output_path):
-            media_path = f"/assets/ep67/{img_filename}"
-            image_generated = True
-            print(f"[ImageGen] Stable Diffusion生图成功：{media_path}")
-
-    # AI 生图均失败，从预设图池随机分配
-    if not image_generated:
-        media_path = random.choice(PRESET_POOL)
-        print(f"[ImageGen] AI生图不可用，从预设图池随机分配：{media_path}")
-
-    # 返回给前端时拼接完整URL
-    image_url = f"{SERVER_BASE_URL}{media_path}" if SERVER_BASE_URL else media_path
-
-    # 5. 存入缓存（result_type='image'，含 ending_type）
-    cur.execute(
-        """INSERT INTO branch_results
-           (highlight_id, episode_id, branch_id, branch_text, ai_response, media_path, result_type, ending_type, prompt_sent, token_usage)
-           VALUES (%s, %s, %s, %s, %s, %s, 'image', %s, %s, %s)
-           ON DUPLICATE KEY UPDATE
-             ai_response=VALUES(ai_response), media_path=VALUES(media_path),
-             ending_type=VALUES(ending_type),
-             prompt_sent=VALUES(prompt_sent), token_usage=VALUES(token_usage),
-             result_type='image'""",
-        (
-            req.highlight_id,
-            episode_id,
-            req.branch_id,
-            branch_text,
-            ai_text,
-            media_path,
-            ai_result["ending_type"],
-            image_prompt,
-            ai_result["token_usage"],
-        ),
-    )
-
-    return {
-        "branch_id":   req.branch_id,
-        "text":         ai_text,
-        "image_url":    image_url,
-        "result_type":  "image",
-        "ending_type":  ai_result["ending_type"],
-        "cached":       False,
-        "token_usage":  ai_result["token_usage"],
-    }
+    finally:
+        conn.close()
